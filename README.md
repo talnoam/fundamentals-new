@@ -33,33 +33,22 @@ Company Risk Factors:
 - Negative growth: +2%
 
 ### 2. Margin of Safety
-The margin of safety provides a buffer against estimation errors and market volatility. It's calculated based on multiple risk factors:
+The margin of safety provides a buffer against estimation errors and market volatility. In the current implementation, it is set to a fixed value of 10% (0.10).
 
 ```python
-margin_of_safety = base_mos + financial_risk + profitability_risk + market_risk + industry_risk + size_risk + growth_risk
+margin_of_safety = 0.10  # Fixed 10% margin of safety
 ```
 
-Components:
-- **Base Margin**: 10%
-- **Financial Risk**:
-  - Low current ratio (<1.5): +5%
-  - High debt-to-equity (>1.0): +5%
-  - Low quick ratio (<1.0): +3%
-- **Profitability Risk**:
-  - Negative earnings: +10%
-  - Low profit margins (<5%): +5%
-- **Market Risk**:
-  - High beta (>1.5): +5%
-  - Low beta (<0.8): -3%
-- **Industry Risk**:
-  - Tech companies: +5%
-  - Stable industries: -3%
-- **Size Risk**:
-  - Small cap: +5%
-  - Large cap: -3%
-- **Growth Risk**:
-  - High growth (>20%): +5%
-  - Negative growth: +8%
+This value is used in the future price calculation to provide a conservative estimate:
+```python
+discounted_price = future_price / ((1 + discount_rate) ** n) * (1 - margin_of_safety)
+```
+
+The 10% margin of safety means that the final price estimate will be 10% lower than the calculated present value, providing a buffer against:
+- Estimation errors in growth rates
+- Market volatility
+- Economic uncertainties
+- Company-specific risks
 
 ### 3. Growth Rate
 The growth rate is obtained from analyst estimates on Yahoo Finance:
