@@ -5,6 +5,7 @@ import pandas as pd
 from io import StringIO
 from datetime import datetime
 from serpapi import GoogleSearch
+import yfinance as yf
 
 def get_next_year_growth_rate(ticker):
     """
@@ -117,6 +118,84 @@ def calculate_returns(realistic_prices_df, current_price):
     df['Annual Return (%)'] = returns
     total_return = (prices[-1] - prices[0]) / prices[0] * 100
     return df, total_return
+
+def calculate_discount_rate(ticker):
+    """
+    Automatically calculates an appropriate discount rate for a company based on:
+    1. Company's beta (market risk)
+    2. Financial health metrics
+    3. Industry characteristics
+    4. Market conditions
+    """
+    info = yf.Ticker(ticker).info
+    
+    # Base components
+    # Get the 10-year Treasury yield
+    treasury = yf.Ticker("^TNX")  # Symbol for 10-year Treasury yield
+    current_yield = treasury.info.get('regularMarketPrice', 4.0)
+    risk_free_rate = current_yield / 100  # Convert percentage to decimal
+
+    # Get S&P 500 data
+    sp500 = yf.Ticker("^GSPC")
+    # Calculate 10-year average return
+    hist = sp500.history(period="10y")
+    avg_return = (hist['Close'].iloc[-1] / hist['Close'].iloc[0]) ** (1/10) - 1
+    # Calculate market risk premium
+    mrp = avg_return - risk_free_rate
+    # Ensure reasonable bounds (3% to 8%)
+    market_risk_premium = max(0.03, min(0.08, mrp))  # Historical market risk premium
+    
+    # Get company beta, default to 1.0 if not available
+    beta = info.get('beta', 1.0)
+    
+    # Company-specific risk factors
+    company_risk = 0.0
+    
+    # 1. Profitability risk
+    if info.get('trailingPE') is None:  # Negative earnings
+        company_risk += 0.02
+    elif info.get('profitMargins', 0) < 0.05:  # Low profit margins
+        company_risk += 0.01
+    
+    # 2. Financial health risk
+    if info.get('debtToEquity', 0) > 1.0:  # High debt
+        company_risk += 0.01
+    if info.get('currentRatio', 2) < 1.5:  # Low current ratio
+        company_risk += 0.01
+    
+    # 3. Market risk (beta)
+    if beta > 1.5:  # High beta
+        company_risk += 0.01
+    elif beta < 0.8:  # Low beta
+        company_risk -= 0.01
+    
+    # 4. Industry risk
+    industry = info.get('industry', '').lower()
+    if any(tech in industry for tech in ['software', 'technology', 'internet']):
+        company_risk += 0.01  # Tech companies typically have higher risk
+    elif any(stable in industry for stable in ['utility', 'consumer defensive', 'healthcare']):
+        company_risk -= 0.01  # More stable industries
+    
+    # 5. Size risk
+    market_cap = info.get('marketCap', 0)
+    if market_cap < 1e9:  # Small cap
+        company_risk += 0.02
+    elif market_cap > 1e11:  # Large cap
+        company_risk -= 0.01
+    
+    # 6. Growth risk
+    if info.get('revenueGrowth', 0) > 0.2:  # High growth
+        company_risk += 0.01
+    elif info.get('revenueGrowth', 0) < 0:  # Negative growth
+        company_risk += 0.02
+    
+    # Calculate final discount rate using CAPM-like approach
+    discount_rate = risk_free_rate + (beta * market_risk_premium) + company_risk
+    
+    # Ensure discount rate is within reasonable bounds (8% to 20%)
+    discount_rate = max(0.08, min(0.20, discount_rate))
+    
+    return discount_rate
 
 
 def get_ir_link_via_google(ticker, api_key):
