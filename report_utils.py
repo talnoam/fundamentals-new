@@ -57,10 +57,11 @@ def estimate_future_eps_df(current_eps, growth_rate, years=5, start_year=None):
     }
     return pd.DataFrame(data)
 
-def estimate_future_prices(future_eps_df, pe_ratio, discount_rate, margin_of_safety):
+def estimate_future_prices(future_eps_df, pe_ratio, discount_rate, margin_of_safety, current_eps, current_price):
     """
     Estimates the future stock price for each projected year using the estimated EPS and a given P/E ratio,
     then discounts each future price to present value using a discount rate and applies a margin of safety.
+    Includes the current year in the calculations.
     
     Formula:
         Future Price = Estimated EPS * P/E Ratio
@@ -76,6 +77,19 @@ def estimate_future_prices(future_eps_df, pe_ratio, discount_rate, margin_of_saf
         pd.DataFrame: DataFrame with columns 'Year', 'Estimated EPS', 'Future Price', 'Discounted Price'.
     """
     results = []
+    current_year = datetime.now().year
+    
+    # Add current year first
+    current_present_value = current_price * (1 - margin_of_safety)  # No discount for current year
+    
+    results.append({
+        "Year": current_year,
+        "Estimated EPS": current_eps,
+        "Future Price": current_price,
+        "Discounted Price": current_present_value
+    })
+
+    # Add future years
     for i, row in future_eps_df.iterrows():
         year = row['Year']
         eps = row['Estimated EPS']
