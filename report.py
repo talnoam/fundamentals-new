@@ -29,7 +29,7 @@ import numpy as np
 from dotenv import load_dotenv
 import os
 
-from report_utils import get_next_year_growth_rate, estimate_future_eps_df, estimate_future_prices, calculate_returns, get_ir_link_via_google, calculate_discount_rate
+from report_utils import get_next_year_growth_rate, estimate_future_eps_df, estimate_future_prices, calculate_returns, get_ir_link_via_google, calculate_discount_rate, get_financial_metrics
 
 load_dotenv()
 SERPAPI_KEY = os.getenv("SERPAPI_KEY")
@@ -37,7 +37,15 @@ SERPAPI_KEY = os.getenv("SERPAPI_KEY")
 ir_required = False
 
 TICKER = "NVDA"
+print(f"Ticker: {TICKER}", "\n")
 years_to_estimate = 3 # the number of years to estimate the future growth of the company
+
+actual_values, percentage_changes = get_financial_metrics(TICKER)
+print("Actual Values:")
+print(actual_values)
+print("\nPercentage Changes:")
+print(percentage_changes)
+
 discount_rate = calculate_discount_rate(TICKER) # the yield that we expect from the company's stock per year
 print('\nDiscount rate: ', discount_rate)
 margin_of_safety = 0.10 # the margin of safety that we want to have
@@ -50,7 +58,7 @@ print('EPS: ', round(EPS, 2))
 future_eps_df = estimate_future_eps_df(EPS, GROWTH_RATE, years=years_to_estimate)
 
 pe_gaap_ttm = yf.Ticker(TICKER).info.get("trailingPE")
-print(f"P/E GAAP (TTM) for {TICKER}:", pe_gaap_ttm, '\n')
+print("P/E GAAP (TTM):", pe_gaap_ttm, '\n')
 
 current_price = yf.Ticker(TICKER).history(period="1d")['Close'].iloc[0]
 

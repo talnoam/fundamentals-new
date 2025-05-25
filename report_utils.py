@@ -211,6 +211,107 @@ def calculate_discount_rate(ticker):
     
     return discount_rate
 
+def get_financial_metrics(ticker):
+    """
+    Gathers key financial metrics for a given ticker using yfinance.
+    
+    Args:
+        ticker (str): The stock ticker symbol
+        
+    Returns:
+        pd.DataFrame: DataFrame containing the financial metrics
+    """
+    stock = yf.Ticker(ticker)
+    
+    # Get financial statements
+    income_stmt = stock.financials
+    balance_sheet = stock.balance_sheet
+    cash_flow = stock.cashflow
+    
+    # Calculate growth rates (3-5 years)
+    def calculate_growth_rate(series):
+        if len(series) >= 4:  # Need at least 4 years of data
+            return (series.iloc[0] / series.iloc[3]) ** (1/3) - 1  # 3-year CAGR
+        return None
+    
+    # Revenue growth
+    revenue = income_stmt.loc['Total Revenue'].dropna()
+    
+    # Net income growth
+    net_income = income_stmt.loc['Net Income'].dropna()
+    
+    # Profit margins (using most recent year)
+    profit_margins = (net_income / revenue) * 100
+    
+    # Assets and Liabilities (most recent)
+    total_assets = balance_sheet.loc['Total Assets'].dropna()
+    total_liabilities = balance_sheet.loc['Total Liabilities Net Minority Interest'].dropna()
+    
+    # Free cash flow growth
+    free_cash_flow = cash_flow.loc['Free Cash Flow'].dropna()
+    
+    # Calculate shares outstanding (Issued - Treasury)
+    shares = stock.get_shares_full(start=pd.to_datetime(total_assets.index).min().strftime("%Y-%m-%d")).astype(float)
+    shares.index = shares.index.tz_convert(None)
+    shares_daily = (shares
+                    .groupby(shares.index.date)          # `.date` ignores the time part
+                    .max()                            # or .mean() / .last()
+                    .rename_axis('Date')
+                    .to_frame('Diluted')              # call the column what it is
+                    )
+    shares_daily.index = pd.to_datetime(shares_daily.index)
+    shares_outstanding = shares_daily['Diluted'].reindex(pd.to_datetime(total_assets.index), method="nearest")
+    
+    # Calculate YoY changes
+    def calculate_yoy_change(series):
+        return series.pct_change(-1) * 100  # -1 to get change from previous year
+    
+    # Create DataFrame with actual values
+    actual_data = {
+        'Revenue': revenue,
+        'Net Income': net_income,
+        'Profit Margin (%)': profit_margins,
+        'Total Assets': total_assets,
+        'Total Liabilities': total_liabilities,
+        'Free Cash Flow': free_cash_flow,
+        'Shares Outstanding': shares_outstanding
+    }
+    
+    actual_df = pd.DataFrame(actual_data)
+    
+    # Format actual values
+    actual_df['Revenue'] = actual_df['Revenue'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
+    actual_df['Net Income'] = actual_df['Net Income'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
+    actual_df['Profit Margin (%)'] = actual_df['Profit Margin (%)'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/A")
+    actual_df['Total Assets'] = actual_df['Total Assets'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
+    actual_df['Total Liabilities'] = actual_df['Total Liabilities'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
+    actual_df['Free Cash Flow'] = actual_df['Free Cash Flow'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
+    actual_df['Shares Outstanding'] = actual_df['Shares Outstanding'].apply(lambda x: f"{x:,.0f}" if pd.notnull(x) else "N/A")
+    
+    # Create DataFrame with percentage changes
+    change_data = {
+        'Revenue Change (%)': calculate_yoy_change(revenue),
+        'Net Income Change (%)': calculate_yoy_change(net_income),
+        'Profit Margin (%)': profit_margins,
+        'Assets Change (%)': calculate_yoy_change(total_assets),
+        'Liabilities Change (%)': calculate_yoy_change(total_liabilities),
+        'Free Cash Flow Change (%)': calculate_yoy_change(free_cash_flow),
+        'Shares Outstanding Change (%)': calculate_yoy_change(shares_outstanding)
+    }
+    
+    change_df = pd.DataFrame(change_data)
+    
+    # Format percentage changes
+    for col in change_df.columns:
+        if 'Change' in col:
+            change_df[col] = change_df[col].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "N/A")
+        elif col == 'Profit Margin (%)':
+            change_df[col] = change_df[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/A")
+        elif col == 'Year':
+            continue
+    
+    return actual_df, change_df
+
 
 def get_ir_link_via_google(ticker, api_key):
     query = f"{ticker} investor relations"
