@@ -264,7 +264,16 @@ def get_financial_metrics(ticker):
     
     # Calculate YoY changes
     def calculate_yoy_change(series):
-        return series.pct_change(-1) * 100  # -1 to get change from previous year
+        """
+        Calculate year-over-year percentage change.
+        
+        Args:
+            series: pandas Series with numerical values
+            
+        Returns:
+            float: percentage change
+        """
+        return series.astype(float).pct_change(-1) * 100  # -1 to get change from previous year
     
     # Create DataFrame with actual values
     actual_data = {
