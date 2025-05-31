@@ -1,129 +1,109 @@
-# Fundamentals: Company Analysis & Valuation
+# Fundamentals Investment Dashboard
 
-## Project Description
-This project analyzes the fundamentals of publicly traded companies to estimate their future earnings per share (EPS), growth rates, and potential stock prices. It is designed for long-term investment analysis (3-5 years) and focuses on companies that are profitable and potentially undervalued by the market.
-
-## Key Parameters and Calculations
-
-### 1. Discount Rate
-The discount rate represents the required rate of return for an investment. It's calculated using a modified Capital Asset Pricing Model (CAPM) approach:
-
-```python
-discount_rate = risk_free_rate + (beta * market_risk_premium) + company_risk
-```
-
-Components:
-- **Risk-free Rate**: Current 10-year Treasury yield (typically 4-5%)
-- **Market Risk Premium**: Historical average return of S&P 500 minus risk-free rate (typically 6%)
-- **Beta**: Company's volatility relative to market (from Yahoo Finance)
-- **Company Risk**: Additional risk factors specific to the company
-
-Company Risk Factors:
-- Negative earnings: +2%
-- Low profit margins (<5%): +1%
-- High debt-to-equity (>1.0): +1%
-- Low current ratio (<1.5): +1%
-- High beta (>1.5): +1%
-- Low beta (<0.8): -1%
-- Tech industry: +1%
-- Stable industries: -1%
-- Small cap: +2%
-- Large cap: -1%
-- High growth (>20%): +1%
-- Negative growth: +2%
-
-### 2. Margin of Safety
-The margin of safety provides a buffer against estimation errors and market volatility. In the current implementation, it is set to a fixed value of 10% (0.10).
-
-```python
-margin_of_safety = 0.10  # Fixed 10% margin of safety
-```
-
-This value is used in the future price calculation to provide a conservative estimate:
-```python
-discounted_price = future_price / ((1 + discount_rate) ** n) * (1 - margin_of_safety)
-```
-
-The 10% margin of safety means that the final price estimate will be 10% lower than the calculated present value, providing a buffer against:
-- Estimation errors in growth rates
-- Market volatility
-- Economic uncertainties
-- Company-specific risks
-
-### 3. Growth Rate
-The growth rate is obtained from analyst estimates on Yahoo Finance:
-- Scrapes the "Growth Estimates" table
-- Uses the "Next Year" growth estimate
-- Expressed as a decimal (e.g., 0.15 for 15%)
-
-### 4. EPS (Earnings Per Share)
-The EPS is obtained from analyst estimates on Yahoo Finance:
-- Scrapes the "Earnings Estimate" table
-- Uses the "Avg. Estimate" for next year
-- Used as the base for future projections
-
-### 5. Future Price Calculation
-Future prices are calculated using:
-```python
-future_price = eps * pe_ratio
-discounted_price = future_price / ((1 + discount_rate) ** n) * (1 - margin_of_safety)
-```
-
-Where:
-- `eps`: Projected earnings per share
-- `pe_ratio`: Price to earnings ratio
-- `n`: Number of years into the future
-- `discount_rate`: Required rate of return
-- `margin_of_safety`: Safety buffer
+A comprehensive Streamlit dashboard for fundamental analysis of stocks, designed for long-term investment decisions (3-5 years).
 
 ## Features
-- Fetches financial data using Yahoo Finance (`yfinance`)
-- Scrapes analyst growth rates and EPS estimates from Yahoo Finance
-- Projects future EPS and stock prices using growth rates and P/E ratios
-- Discounts future prices to present value with a margin of safety
-- Calculates annual and total returns
-- Optionally fetches investor relations links for further research
 
-## Setup Instructions
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/talnoam/fundamentals.git
-   cd fundamentals
-   ```
-2. **Create and activate a virtual environment:**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. **Install requirements:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+- **Interactive Dashboard**: User-friendly interface for analyzing any stock ticker
+- **Comprehensive Analysis**: 
+  - Historical financial data and trends
+  - Growth rate calculations
+  - Future price projections
+  - Intrinsic value estimation
+  - Risk assessment
+- **Investment Metrics**:
+  - P/E ratios
+  - Discount rates
+  - Margin of safety
+  - Expected returns
+- **Visual Charts**: Price projection graphs and data tables
+- **Investment Recommendations**: Buy/Hold/Avoid signals based on analysis
+
+## Installation
+
+1. Clone or download this repository
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. (Optional) Create a `.env` file with your SerpAPI key for investor relations links:
+```
+SERPAPI_KEY=your_serpapi_key_here
+```
 
 ## Usage
-- Edit `report.py` to set your desired ticker symbol and parameters
-- Run the analysis:
-  ```bash
-  python report.py
-  ```
-- The script will output:
-  - Growth rate and EPS for the next year
-  - Projected EPS and stock prices for the next N years
-  - Discounted present values and annual returns
-  - (Optional) Investor relations link for the company
 
-## Environment Variables
-- The project uses a `.env` file to store sensitive information such as API keys (e.g., `SERPAPI_KEY`)
-- Example `.env` file:
-  ```
-  SERPAPI_KEY=your_serpapi_key_here
-  ```
-- **Security Note:** `.env` is included in `.gitignore` and should never be committed to version control
+### Running the Dashboard
 
-## Security & Best Practices
-- Never share your `.env` file or API keys publicly
-- Always use a virtual environment to manage dependencies
-- Review and comply with the terms of service for any data providers or APIs you use
+```bash
+streamlit run dashboard.py
+```
 
-## License
-This project is for educational and research purposes. Please review the data sources' terms of use before using in production or commercial settings. 
+The dashboard will open in your browser at `http://localhost:8501`
+
+### Using the Dashboard
+
+1. **Enter a Ticker**: Input any valid stock symbol (e.g., AAPL, NVDA, TSLA)
+2. **Set Parameters**: 
+   - Adjust investment timeline (1-10 years)
+   - Set margin of safety (5-30%)
+3. **Analyze**: Click "Analyze Company" to generate the full report
+4. **Review Results**: 
+   - Key metrics at the top
+   - Buy/Hold/Avoid recommendation
+   - Detailed financial analysis in tabs
+   - Risk assessment
+   - Investment summary
+
+### Running the Original Script
+
+You can also run the original command-line version:
+
+```bash
+python report.py
+```
+
+## Key Components
+
+- `dashboard.py`: Streamlit web interface
+- `report.py`: Original command-line analysis script
+- `report_utils.py`: Core analysis functions and calculations
+
+## Investment Methodology
+
+This tool focuses on fundamental analysis for profitable companies using:
+
+- **Discounted Cash Flow (DCF)** modeling
+- **Price-to-Earnings (P/E)** ratio analysis
+- **Growth rate** projections based on analyst estimates
+- **Risk-adjusted discount rates** based on company characteristics
+- **Margin of safety** for conservative valuations
+
+## Important Disclaimers
+
+⚠️ **This tool is for educational purposes only and should not be considered as financial advice.**
+
+- Always conduct your own research
+- Consult with a qualified financial advisor
+- Past performance does not guarantee future results
+- All investments carry risk of loss
+
+## Data Sources
+
+- Financial data: Yahoo Finance (via yfinance)
+- Analyst estimates: Yahoo Finance Analysis pages
+- Company information: Yahoo Finance API
+
+## Technical Requirements
+
+- Python 3.8+
+- Internet connection for real-time data
+- Modern web browser for Streamlit interface
+
+## Troubleshooting
+
+- **"No data found"**: Check if the ticker symbol is correct
+- **"EPS is negative"**: The tool only analyzes profitable companies
+- **Connection errors**: Check your internet connection
+- **Missing data**: Some companies may not have complete financial data available 
