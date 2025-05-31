@@ -228,12 +228,6 @@ def get_financial_metrics(ticker):
     balance_sheet = stock.balance_sheet
     cash_flow = stock.cashflow
     
-    # Calculate growth rates (3-5 years)
-    def calculate_growth_rate(series):
-        if len(series) >= 4:  # Need at least 4 years of data
-            return (series.iloc[0] / series.iloc[3]) ** (1/3) - 1  # 3-year CAGR
-        return None
-    
     # Revenue growth
     revenue = income_stmt.loc['Total Revenue'].dropna()
     
@@ -241,7 +235,18 @@ def get_financial_metrics(ticker):
     net_income = income_stmt.loc['Net Income'].dropna()
     
     # Profit margins (using most recent year)
-    profit_margins = (net_income / revenue) * 100
+    # Calculate profit margins safely
+    def safe_division(numerator, denominator):
+        """Safely calculate division, handling zero and negative values."""
+        if denominator == 0:
+            return float('inf') if numerator > 0 else float('-inf') if numerator < 0 else 0
+        return numerator / denominator
+    
+    # Calculate profit margins for each year
+    profit_margins = pd.Series(
+        [safe_division(ni, rev) * 100 for ni, rev in zip(net_income, revenue)],
+        index=revenue.index
+    )
     
     # Assets and Liabilities (most recent)
     total_assets = balance_sheet.loc['Total Assets'].dropna()
@@ -273,7 +278,9 @@ def get_financial_metrics(ticker):
         Returns:
             float: percentage change
         """
-        return series.astype(float).pct_change(-1) * 100  # -1 to get change from previous year
+        series = series.astype(float)
+        changes = series.pct_change(-1) * 100
+        return changes.replace([float('inf'), float('-inf')], None)  # -1 to get change from previous year
     
     # Create DataFrame with actual values
     actual_data = {
@@ -291,7 +298,9 @@ def get_financial_metrics(ticker):
     # Format actual values
     actual_df['Revenue'] = actual_df['Revenue'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
     actual_df['Net Income'] = actual_df['Net Income'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
-    actual_df['Profit Margin (%)'] = actual_df['Profit Margin (%)'].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/A")
+    actual_df['Profit Margin (%)'] = actual_df['Profit Margin (%)'].apply(
+        lambda x: f"{x:.2f}%" if pd.notnull(x) and abs(x) != float('inf') else "N/A"
+    )
     actual_df['Total Assets'] = actual_df['Total Assets'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
     actual_df['Total Liabilities'] = actual_df['Total Liabilities'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
     actual_df['Free Cash Flow'] = actual_df['Free Cash Flow'].apply(lambda x: f"${x:,.0f}" if pd.notnull(x) else "N/A")
@@ -313,11 +322,13 @@ def get_financial_metrics(ticker):
     # Format percentage changes
     for col in change_df.columns:
         if 'Change' in col:
-            change_df[col] = change_df[col].apply(lambda x: f"{x:+.2f}%" if pd.notnull(x) else "N/A")
+            change_df[col] = change_df[col].apply(
+                lambda x: f"{x:+.2f}%" if pd.notnull(x) and abs(x) != float('inf') else "N/A"
+            )
         elif col == 'Profit Margin (%)':
-            change_df[col] = change_df[col].apply(lambda x: f"{x:.2f}%" if pd.notnull(x) else "N/A")
-        elif col == 'Year':
-            continue
+            change_df[col] = change_df[col].apply(
+                lambda x: f"{x:.2f}%" if pd.notnull(x) and abs(x) != float('inf') else "N/A"
+            )
     
     return actual_df, change_df
 

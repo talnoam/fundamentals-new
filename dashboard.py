@@ -21,7 +21,7 @@ st.markdown("**Long-term investment analysis for profitable companies (3-5 years
 st.sidebar.header("Investment Parameters")
 
 # Ticker input
-ticker = st.sidebar.text_input("Enter Stock Ticker", value="NVDA", help="Enter the stock symbol (e.g., AAPL, NVDA, TSLA)")
+ticker = st.sidebar.text_input("Enter Stock Ticker", value="NVDA", help="Enter the stock symbol (e.g., AAPL, NVDA, TSLA)").upper()
 
 # Investment parameters
 years_to_estimate = st.sidebar.slider("Years to Estimate", min_value=3, max_value=5, value=3)
