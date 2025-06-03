@@ -13,6 +13,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state
+if 'analysis_results' not in st.session_state:
+    st.session_state.analysis_results = None
+if 'current_ticker' not in st.session_state:
+    st.session_state.current_ticker = None
+if 'current_years' not in st.session_state:
+    st.session_state.current_years = None
+
 # Dashboard title
 st.title("📊 Fundamentals Investment Dashboard")
 st.markdown("**Long-term investment analysis for profitable companies (3-5 years)**")
@@ -59,37 +67,44 @@ if analyze_button and ticker:
             ir_required=ir_required
         )
         
-        # Display the results
-        display_analysis_results(results)
-        
-        # Add candlestick chart section
-        st.divider()
-        st.header("📈 Price Chart Analysis")
-        
-        # Chart controls
-        col1, col2 = st.columns([1, 3])
-        
-        with col1:
-            timeframe = st.selectbox(
-                "Select Timeframe",
-                ["Daily", "Weekly", "Monthly"],
-                index=1,  # Default to Weekly
-                help="Choose the timeframe for the candlestick chart"
-            )
-        
-        with col2:
-            st.info(f"Showing {timeframe.lower()} data for the last {years_to_estimate} years")
-        
-        # Create and display the chart
-        with st.spinner("Loading chart..."):
-            fig = create_candlestick_chart(ticker, years_to_estimate, timeframe)
-            if fig is not None:
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.error("Unable to load chart data")
+        # Store results in session state
+        st.session_state.analysis_results = results
+        st.session_state.current_ticker = ticker
+        st.session_state.current_years = years_to_estimate
 
 elif not ticker and analyze_button:
     st.warning("Please enter a ticker symbol to analyze.")
+
+# Display analysis results if they exist in session state
+if st.session_state.analysis_results is not None:
+    # Display the results
+    display_analysis_results(st.session_state.analysis_results)
+    
+    # Add candlestick chart section
+    st.divider()
+    st.header("📈 Price Chart Analysis")
+    
+    # Chart controls
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        timeframe = st.selectbox(
+            "Select Timeframe",
+            ["Daily", "Weekly", "Monthly"],
+            index=1,  # Default to Weekly
+            help="Choose the timeframe for the candlestick chart"
+        )
+    
+    with col2:
+        st.info(f"Showing {timeframe.lower()} data for the last {st.session_state.current_years} years")
+    
+    # Create and display the chart
+    with st.spinner("Loading chart..."):
+        fig = create_candlestick_chart(st.session_state.current_ticker, st.session_state.current_years, timeframe)
+        if fig is not None:
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.error("Unable to load chart data")
 
 # Footer
 st.divider()

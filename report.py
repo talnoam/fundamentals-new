@@ -402,13 +402,10 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe):
         # Get different intervals based on timeframe
         if timeframe == "Daily":
             interval = "1d"
-            period_days = min(years_to_estimate * 365, 365)  # Max 1 year for daily
         elif timeframe == "Weekly":
             interval = "1wk"
-            period_days = years_to_estimate * 365
         else:  # Monthly
             interval = "1mo"
-            period_days = years_to_estimate * 365
             
         # Download data
         data = stock.history(
@@ -421,13 +418,13 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe):
             st.error(f"No data available for {ticker}")
             return None
             
-        # Create candlestick chart
+        # Create candlestick chart with reduced volume chart height
         fig = make_subplots(
             rows=2, cols=1,
             shared_xaxes=True,
-            vertical_spacing=0.1,
+            vertical_spacing=0.05,  # Reduced spacing between charts
             subplot_titles=(f'{ticker} Stock Price ({timeframe})', 'Volume'),
-            row_width=[0.7, 0.3]
+            row_heights=[0.8, 0.2]  # 80% for price, 20% for volume
         )
         
         # Add candlestick chart
