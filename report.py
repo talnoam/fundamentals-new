@@ -25,10 +25,12 @@
 import yfinance as yf
 from datetime import datetime
 import pandas as pd
-import numpy as np
 from dotenv import load_dotenv
 import os
 import streamlit as st
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 
 from report_utils import (
     get_next_year_growth_rate, 
@@ -385,3 +387,90 @@ def display_analysis_results(results):
     if 'ir_link' in results:
         st.subheader("🔗 Additional Resources")
         st.write(f"[Investor Relations Page]({results['ir_link']})")
+
+
+# Function to create candlestick chart
+def create_candlestick_chart(ticker, years_to_estimate, timeframe):
+    try:
+        # Calculate the period based on years_to_estimate
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=years_to_estimate * 365)
+        
+        # Download stock data
+        stock = yf.Ticker(ticker)
+        
+        # Get different intervals based on timeframe
+        if timeframe == "Daily":
+            interval = "1d"
+            period_days = min(years_to_estimate * 365, 365)  # Max 1 year for daily
+        elif timeframe == "Weekly":
+            interval = "1wk"
+            period_days = years_to_estimate * 365
+        else:  # Monthly
+            interval = "1mo"
+            period_days = years_to_estimate * 365
+            
+        # Download data
+        data = stock.history(
+            start=start_date,
+            end=end_date,
+            interval=interval
+        )
+        
+        if data.empty:
+            st.error(f"No data available for {ticker}")
+            return None
+            
+        # Create candlestick chart
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.1,
+            subplot_titles=(f'{ticker} Stock Price ({timeframe})', 'Volume'),
+            row_width=[0.7, 0.3]
+        )
+        
+        # Add candlestick chart
+        fig.add_trace(
+            go.Candlestick(
+                x=data.index,
+                open=data['Open'],
+                high=data['High'],
+                low=data['Low'],
+                close=data['Close'],
+                name="Price"
+            ),
+            row=1, col=1
+        )
+        
+        # Add volume chart
+        fig.add_trace(
+            go.Bar(
+                x=data.index,
+                y=data['Volume'],
+                name="Volume",
+                marker_color='rgba(0,150,255,0.6)'
+            ),
+            row=2, col=1
+        )
+        
+        # Update layout
+        fig.update_layout(
+            height=600,
+            title_text=f"{ticker} Stock Analysis - {timeframe} View",
+            xaxis_rangeslider_visible=False,
+            showlegend=False
+        )
+        
+        # Update x-axis
+        fig.update_xaxes(title_text="Date", row=2, col=1)
+        
+        # Update y-axis
+        fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+        fig.update_yaxes(title_text="Volume", row=2, col=1)
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"Error creating chart: {str(e)}")
+        return None

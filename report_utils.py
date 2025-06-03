@@ -6,6 +6,7 @@ from io import StringIO
 from datetime import datetime
 from serpapi import GoogleSearch
 import yfinance as yf
+import streamlit as st
 
 def get_next_year_growth_rate(ticker):
     """
@@ -347,4 +348,33 @@ def get_ir_link_via_google(ticker, api_key):
     else:
         return "Not found"
 
-
+# Function to get all available tickers
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_all_tickers():
+    try:
+        # Get S&P 500 tickers
+        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
+        sp500_tickers = sp500['Symbol'].tolist()
+        
+        # Get NASDAQ tickers
+        nasdaq = pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100')[4]
+        nasdaq_tickers = nasdaq['Ticker'].tolist()
+        
+        # Get Dow Jones tickers
+        dow = pd.read_html('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')[2]
+        dow_tickers = dow['Symbol'].tolist()
+        
+        # Combine all tickers
+        tickers = set(sp500_tickers + nasdaq_tickers + dow_tickers)
+        
+        # Add major indices and popular stocks
+        tickers.update(['^GSPC', '^DJI', '^IXIC', '^RUT', 'ASTS', 'PLTR', 'SOFI', 'AMD', 'NVDA'])
+        
+        # Convert to list and sort
+        tickers_list = sorted(list(tickers))
+        
+        return tickers_list
+    except Exception as e:
+        st.error(f"Error loading tickers: {str(e)}")
+        # Fallback to a basic list
+        return ['AAPL', 'MSFT', 'GOOGL', 'NVDA', 'ASTS', 'PLTR', 'SOFI', 'AMD']

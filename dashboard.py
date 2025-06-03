@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
 # Import the analysis functions from report.py
-from report import analyze_company, display_analysis_results
+from report import analyze_company, display_analysis_results, create_candlestick_chart
+from report_utils import get_all_tickers
 
 # Configure Streamlit page
 st.set_page_config(
@@ -20,8 +20,25 @@ st.markdown("**Long-term investment analysis for profitable companies (3-5 years
 # Sidebar for inputs
 st.sidebar.header("Investment Parameters")
 
-# Ticker input
-ticker = st.sidebar.text_input("Enter Stock Ticker", value="NVDA", help="Enter the stock symbol (e.g., AAPL, NVDA, TSLA)").upper()
+# Create a search box for custom ticker input
+custom_ticker = st.sidebar.text_input(
+    "Or enter custom ticker",
+    help="Enter any valid stock symbol"
+).upper()
+
+# Get all tickers
+tickers = get_all_tickers()
+
+# Create a selectbox with search functionality
+selected_ticker = st.sidebar.selectbox(
+    "Select Stock",
+    tickers,
+    index=tickers.index("NVDA") if "NVDA" in tickers else 0,
+    help="Search for any available stock symbol"
+)
+
+# Use custom ticker if provided, otherwise use selected ticker
+ticker = custom_ticker if custom_ticker else selected_ticker
 
 # Investment parameters
 years_to_estimate = st.sidebar.slider("Years to Estimate", min_value=3, max_value=5, value=3)
@@ -44,6 +61,32 @@ if analyze_button and ticker:
         
         # Display the results
         display_analysis_results(results)
+        
+        # Add candlestick chart section
+        st.divider()
+        st.header("📈 Price Chart Analysis")
+        
+        # Chart controls
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            timeframe = st.selectbox(
+                "Select Timeframe",
+                ["Daily", "Weekly", "Monthly"],
+                index=1,  # Default to Weekly
+                help="Choose the timeframe for the candlestick chart"
+            )
+        
+        with col2:
+            st.info(f"Showing {timeframe.lower()} data for the last {years_to_estimate} years")
+        
+        # Create and display the chart
+        with st.spinner("Loading chart..."):
+            fig = create_candlestick_chart(ticker, years_to_estimate, timeframe)
+            if fig is not None:
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.error("Unable to load chart data")
 
 elif not ticker and analyze_button:
     st.warning("Please enter a ticker symbol to analyze.")
