@@ -8,6 +8,87 @@ from serpapi import GoogleSearch
 import yfinance as yf
 import streamlit as st
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/132.0.0.0 Safari/537.36"
+    )
+}
+
+def get_sp500_tickers():
+    """
+    Fetch S&P 500 tickers from Wikipedia with a proper User-Agent header,
+    and format them like yahoo_fin does (replace '.' with '-').
+    """
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    
+    resp = requests.get(url, headers=HEADERS)
+    resp.raise_for_status()
+
+    tables = pd.read_html(resp.text)
+    sp500_df = tables[1]  # first table = S&P 500 constituents
+
+    # yahoo_fin replaces '.' with '-' in tickers
+    return sp500_df["Symbol"].str.replace(".", "-", regex=False).tolist()
+
+def get_dow_tickers():
+    """Return list of Dow Jones Industrial Average tickers."""
+    url = "https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average"
+    resp = requests.get(url, headers=HEADERS)
+    resp.raise_for_status()
+
+    tables = pd.read_html(resp.text)
+
+    dow_df = None
+    for tbl in tables:
+        # Different Wiki revisions may call the column 'Symbol' or 'Ticker symbol'
+        if "Symbol" in tbl.columns:
+            dow_df = tbl
+            symbol_col = "Symbol"
+            break
+        if "Ticker symbol" in tbl.columns:
+            dow_df = tbl
+            symbol_col = "Ticker symbol"
+            break
+
+    if dow_df is None:
+        raise RuntimeError("Could not find Dow components table on Wikipedia page.")
+
+    return (
+        dow_df[symbol_col]
+        .astype(str)
+        .str.strip()
+        .str.replace(".", "-", regex=False)
+        .tolist()
+    )
+
+def get_nasdaq_tickers():
+    """Return list of NASDAQ-listed tickers."""
+    url = "https://www.nasdaqtrader.com/dynamic/symdir/nasdaqlisted.txt"
+    resp = requests.get(url, headers=HEADERS)
+    resp.raise_for_status()
+
+    # Pipe-separated text file
+    df = pd.read_csv(StringIO(resp.text), sep="|")
+
+    # Drop the last 'File Creation Time' row and test issues
+    if "Test Issue" in df.columns:
+        df = df[df["Test Issue"] == "N"]
+
+    # Remove any nan/empty symbols
+    tickers = (
+        df["Symbol"]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .str.replace(".", "-", regex=False)
+        .unique()
+        .tolist()
+    )
+
+    return tickers
+
 def get_next_year_growth_rate(ticker):
     """
     Scrapes Yahoo Finance's Analysis page for a given ticker to extract:
@@ -18,23 +99,13 @@ def get_next_year_growth_rate(ticker):
         eps (float): Analyst consensus EPS estimate for next year.
         growth_rate (float): Expected EPS growth rate for next year (as a decimal, e.g., 0.12 for 12%).
     """
-    url = f"https://finance.yahoo.com/quote/{ticker}/analysis"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    stock = yf.Ticker(f"{ticker}")
+    eps_trend = stock.eps_trend
+    eps_next = eps_trend[(eps_trend.index == '+1y')]['current'].iloc[0]
+    eps_current = eps_trend[(eps_trend.index == '0y')]['current'].iloc[0]
+    growth_rate = eps_next/eps_current - 1
 
-    # Find all tables
-    growth_table = soup.find_all("table")[5]
-    growth_df = pd.read_html(StringIO(str(growth_table)))[0]
-    growth_rate = float(growth_df[growth_df['Unnamed: 0'] == ticker]['Next Year'].iloc[0].strip('%'))/100
-
-    eps_table = soup.find_all("table")[0]
-    eps_df = pd.read_html(StringIO(str(eps_table)))[0]
-    eps = eps_df[eps_df['Currency in USD'] == 'Avg. Estimate'][eps_df.columns[-1]].iloc[0]
-
-    return eps, growth_rate
+    return eps_next, growth_rate
 
 def estimate_future_eps_df(current_eps, growth_rate, years=5, start_year=None):
     """
@@ -353,16 +424,13 @@ def get_ir_link_via_google(ticker, api_key):
 def get_all_tickers():
     try:
         # Get S&P 500 tickers
-        sp500 = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]
-        sp500_tickers = sp500['Symbol'].tolist()
+        sp500_tickers = get_sp500_tickers()
         
         # Get NASDAQ tickers
-        nasdaq = pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100')[4]
-        nasdaq_tickers = nasdaq['Ticker'].tolist()
+        nasdaq_tickers = get_nasdaq_tickers()
         
         # Get Dow Jones tickers
-        dow = pd.read_html('https://en.wikipedia.org/wiki/Dow_Jones_Industrial_Average')[2]
-        dow_tickers = dow['Symbol'].tolist()
+        dow_tickers = get_dow_tickers()
         
         # Combine all tickers
         tickers = set(sp500_tickers + nasdaq_tickers + dow_tickers)
