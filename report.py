@@ -390,7 +390,19 @@ def display_analysis_results(results):
 
 
 # Function to create candlestick chart
-def create_candlestick_chart(ticker, years_to_estimate, timeframe):
+def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=None):
+    """
+    Create a candlestick chart with optional SMA indicators.
+    
+    Args:
+        ticker (str): Stock ticker symbol
+        years_to_estimate (int): Number of years of historical data
+        timeframe (str): "Daily", "Weekly", or "Monthly"
+        sma_periods (list): List of SMA periods to display (e.g., [20, 50, 150, 200])
+    
+    Returns:
+        plotly.graph_objects.Figure: The chart figure
+    """
     try:
         # Calculate the period based on years_to_estimate
         end_date = datetime.now()
@@ -417,7 +429,13 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe):
         if data.empty:
             st.error(f"No data available for {ticker}")
             return None
-            
+        
+        # Calculate SMAs if requested
+        if sma_periods:
+            for period in sma_periods:
+                if len(data) >= period:
+                    data[f'SMA_{period}'] = data['Close'].rolling(window=period).mean()
+        
         # Create candlestick chart with reduced volume chart height
         fig = make_subplots(
             rows=2, cols=1,
@@ -440,6 +458,32 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe):
             row=1, col=1
         )
         
+        # Add SMA lines if requested
+        if sma_periods:
+            # Color mapping for different SMA periods
+            sma_colors = {
+                20: 'rgba(255, 0, 0, 0.8)',      # Red
+                50: 'rgba(0, 255, 0, 0.8)',      # Green
+                150: 'rgba(0, 0, 255, 0.8)',     # Blue
+                200: 'rgba(255, 165, 0, 0.8)'    # Orange
+            }
+            
+            for period in sma_periods:
+                if f'SMA_{period}' in data.columns:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=data.index,
+                            y=data[f'SMA_{period}'],
+                            mode='lines',
+                            name=f'SMA {period}',
+                            line=dict(
+                                color=sma_colors.get(period, 'rgba(128, 128, 128, 0.8)'),
+                                width=2
+                            )
+                        ),
+                        row=1, col=1
+                    )
+        
         # Add volume chart
         fig.add_trace(
             go.Bar(
@@ -456,7 +500,14 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe):
             height=600,
             title_text=f"{ticker} Stock Analysis - {timeframe} View",
             xaxis_rangeslider_visible=False,
-            showlegend=False
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
         )
         
         # Update x-axis

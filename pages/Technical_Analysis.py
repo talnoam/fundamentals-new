@@ -59,6 +59,26 @@ years = st.sidebar.slider(
     help="Select how many years of historical data to display"
 )
 
+# SMA indicators selection
+st.sidebar.header("Technical Indicators")
+st.sidebar.markdown("**Simple Moving Averages (SMA)**")
+
+sma_20 = st.sidebar.checkbox("SMA 20", value=False, help="20-period Simple Moving Average")
+sma_50 = st.sidebar.checkbox("SMA 50", value=False, help="50-period Simple Moving Average")
+sma_150 = st.sidebar.checkbox("SMA 150", value=False, help="150-period Simple Moving Average")
+sma_200 = st.sidebar.checkbox("SMA 200", value=False, help="200-period Simple Moving Average")
+
+# Collect selected SMA periods
+sma_periods = []
+if sma_20:
+    sma_periods.append(20)
+if sma_50:
+    sma_periods.append(50)
+if sma_150:
+    sma_periods.append(150)
+if sma_200:
+    sma_periods.append(200)
+
 # Update session state
 st.session_state.current_ticker = ticker
 st.session_state.current_years = years
@@ -83,7 +103,9 @@ if ticker:
     
     # Create and display the chart
     with st.spinner("Loading chart..."):
-        fig = create_candlestick_chart(ticker, years, timeframe)
+        # Pass SMA periods if any are selected
+        sma_list = sma_periods if sma_periods else None
+        fig = create_candlestick_chart(ticker, years, timeframe, sma_periods=sma_list)
         if fig is not None:
             st.plotly_chart(fig, use_container_width=True)
         else:
