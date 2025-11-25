@@ -1,5 +1,10 @@
 import streamlit as st
 import pandas as pd
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import modules
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the analysis functions from report.py
 from report import analyze_company, display_analysis_results, create_candlestick_chart

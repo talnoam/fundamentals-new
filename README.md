@@ -1,33 +1,39 @@
-# Fundamentals Investment Dashboard
+# Investment Analysis Dashboards
 
-A comprehensive Streamlit dashboard for fundamental analysis of stocks, designed for long-term investment decisions (3-5 years).
+A comprehensive multi-page Streamlit application for investment analysis, featuring both fundamental and technical analysis dashboards for stock evaluation and long-term investment decisions (3-5 years).
 
 ## Features
 
-- **Interactive Dashboard**: User-friendly interface for analyzing any stock ticker
+- **Multi-Page Application**: Unified platform with automatic sidebar navigation
+  - Landing page with dashboard overview
+  - Fundamentals Dashboard for comprehensive company analysis
+  - Technical Analysis Dashboard for price chart analysis
+- **Interactive Dashboards**: User-friendly interfaces for analyzing any stock ticker
 - **Comprehensive Stock Selection**:
   - Dropdown selection from S&P 500, NASDAQ-100, and Dow Jones companies
   - Search functionality with major indices and popular stocks
   - Custom ticker input for any stock symbol
-- **Comprehensive Analysis**: 
+- **Fundamentals Analysis**: 
   - Historical financial data and trends
   - Growth rate calculations
   - Future price projections
   - Intrinsic value estimation
   - Risk assessment
-- **Interactive Price Charts**:
-  - Candlestick charts with OHLC (Open, High, Low, Close) data
+  - Investment recommendations (Buy/Hold/Avoid)
+- **Technical Analysis**:
+  - Interactive candlestick charts with OHLC (Open, High, Low, Close) data
   - Volume analysis charts
   - Multiple timeframes: Daily, Weekly, Monthly
+  - Historical data visualization (1-10 years)
+- **Interactive Price Charts**:
   - Interactive zoom, pan, and hover functionality
-  - Chart data spans the analysis period (years_to_estimate)
+  - Chart data spans the analysis period
 - **Investment Metrics**:
   - P/E ratios
   - Discount rates
   - Margin of safety
   - Expected returns
-- **Persistent Analysis**: Session state keeps analysis results when changing chart timeframes
-- **Investment Recommendations**: Buy/Hold/Avoid signals based on analysis
+- **Persistent Analysis**: Session state keeps analysis results when navigating between pages
 
 ## Installation
 
@@ -44,34 +50,62 @@ SERPAPI_KEY=your_serpapi_key_here
 
 ## Usage
 
-### Running the Dashboard
+### Running the Application
 
+Run the main application (includes all dashboards):
 ```bash
-streamlit run dashboard.py
+streamlit run app.py
 ```
 
-The dashboard will open in your browser at `http://localhost:8501`
+The application will open in your browser at `http://localhost:8501`
 
-### Using the Dashboard
+### Navigation
 
-1. **Select a Stock**: 
+The application uses Streamlit's built-in multi-page navigation:
+- **Landing Page** (`app.py`): Welcome page with dashboard overview
+- **Fundamentals Dashboard** (`pages/Fundamentals.py`): Comprehensive fundamental analysis
+- **Technical Analysis Dashboard** (`pages/Technical_Analysis.py`): Price chart analysis
+
+Navigate between pages using the sidebar menu that appears automatically in multi-page Streamlit apps.
+
+### Using the Application
+
+#### Landing Page
+The landing page provides an overview of available dashboards and getting started instructions.
+
+#### Fundamentals Dashboard
+1. **Navigate**: Select "Fundamentals" from the sidebar menu
+2. **Select a Stock**: 
    - Choose from the dropdown list of major stocks (S&P 500, NASDAQ-100, Dow Jones)
    - Or enter any custom ticker symbol
-2. **Set Parameters**: 
+3. **Set Parameters**: 
    - Adjust investment timeline (3-5 years)
    - Set margin of safety (5-30%)
-3. **Analyze**: Click "Analyze Company" to generate the full report
-4. **Review Results**: 
+4. **Analyze**: Click "Analyze Company" to generate the full report
+5. **Review Results**: 
    - Key metrics and company information
    - Buy/Hold/Avoid recommendation
    - Detailed financial analysis with percentage changes
    - Risk assessment factors
    - Investment summary with projected returns
-5. **Interactive Charts**:
+6. **Interactive Charts**:
    - View candlestick price charts below the analysis
    - Switch between Daily, Weekly, and Monthly timeframes
    - Analyze volume patterns and price movements
    - Charts automatically update based on your analysis period
+
+#### Technical Analysis Dashboard
+1. **Navigate**: Select "Technical_Analysis" from the sidebar menu
+2. **Select a Stock**: 
+   - Choose from the dropdown list of major stocks (S&P 500, NASDAQ-100, Dow Jones)
+   - Or enter any custom ticker symbol
+3. **Set Parameters**: 
+   - Adjust years of historical data (1-10 years)
+4. **View Charts**:
+   - Interactive candlestick price charts with volume
+   - Switch between Daily, Weekly, and Monthly timeframes
+   - Analyze price movements and trading volume patterns
+   - Charts update automatically based on your selected parameters
 
 ### Chart Features
 
@@ -94,7 +128,9 @@ python report.py
 
 ## Key Components
 
-- `dashboard.py`: Streamlit web interface with chart functionality
+- `app.py`: Main entry point and landing page for the multi-page application
+- `pages/Fundamentals.py`: Streamlit page for fundamental analysis with chart functionality
+- `pages/Technical_Analysis.py`: Streamlit page for technical analysis and price charts
 - `report.py`: Core analysis logic and candlestick chart creation
 - `report_utils.py`: Financial calculations, data fetching, and ticker management
 
