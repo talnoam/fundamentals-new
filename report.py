@@ -389,16 +389,87 @@ def display_analysis_results(results):
         st.write(f"[Investor Relations Page]({results['ir_link']})")
 
 
-# Function to create candlestick chart
-def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=None):
+def calculate_support_resistance(data, window=20, num_levels=5):
     """
-    Create a candlestick chart with optional SMA indicators.
+    Calculate support and resistance levels from price data.
+    
+    Args:
+        data (pd.DataFrame): Price data with 'High', 'Low', 'Close' columns
+        window (int): Window size for finding local extrema
+        num_levels (int): Maximum number of support/resistance levels to return
+    
+    Returns:
+        tuple: (support_levels, resistance_levels) as lists of price values
+    """
+    try:
+        # Find local minima (support) and maxima (resistance)
+        highs = data['High'].values
+        lows = data['Low'].values
+        
+        support_levels = []
+        resistance_levels = []
+        
+        # Find local minima (support levels)
+        for i in range(window, len(lows) - window):
+            if lows[i] == min(lows[i-window:i+window+1]):
+                # Check if this level has been tested multiple times
+                level = lows[i]
+                tolerance = level * 0.02  # 2% tolerance
+                touches = sum(1 for low in lows[max(0, i-window*2):min(len(lows), i+window*2)] 
+                            if abs(low - level) <= tolerance)
+                if touches >= 2:  # At least 2 touches to be significant
+                    support_levels.append((level, touches))
+        
+        # Find local maxima (resistance levels)
+        for i in range(window, len(highs) - window):
+            if highs[i] == max(highs[i-window:i+window+1]):
+                # Check if this level has been tested multiple times
+                level = highs[i]
+                tolerance = level * 0.02  # 2% tolerance
+                touches = sum(1 for high in highs[max(0, i-window*2):min(len(highs), i+window*2)] 
+                            if abs(high - level) <= tolerance)
+                if touches >= 2:  # At least 2 touches to be significant
+                    resistance_levels.append((level, touches))
+        
+        # Sort by number of touches and get top levels
+        support_levels.sort(key=lambda x: x[1], reverse=True)
+        resistance_levels.sort(key=lambda x: x[1], reverse=True)
+        
+        # Get unique levels (remove duplicates within tolerance)
+        def get_unique_levels(levels, tolerance_pct=0.02):
+            unique = []
+            for level, touches in levels:
+                is_duplicate = False
+                for existing_level, _ in unique:
+                    if abs(level - existing_level) / existing_level <= tolerance_pct:
+                        is_duplicate = True
+                        break
+                if not is_duplicate:
+                    unique.append((level, touches))
+            return unique
+        
+        support_unique = get_unique_levels(support_levels[:num_levels*2])
+        resistance_unique = get_unique_levels(resistance_levels[:num_levels*2])
+        
+        # Return top N levels
+        support = [level for level, _ in support_unique[:num_levels]]
+        resistance = [level for level, _ in resistance_unique[:num_levels]]
+        
+        return support, resistance
+    except Exception:
+        return [], []
+
+# Function to create candlestick chart
+def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=None, show_support_resistance=False):
+    """
+    Create a candlestick chart with optional SMA indicators and support/resistance levels.
     
     Args:
         ticker (str): Stock ticker symbol
         years_to_estimate (int): Number of years of historical data
         timeframe (str): "Daily", "Weekly", or "Monthly"
         sma_periods (list): List of SMA periods to display (e.g., [20, 50, 150, 200])
+        show_support_resistance (bool): Whether to show automatic support and resistance levels
     
     Returns:
         plotly.graph_objects.Figure: The chart figure
@@ -435,6 +506,36 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=N
             for period in sma_periods:
                 if len(data) >= period:
                     data[f'SMA_{period}'] = data['Close'].rolling(window=period).mean()
+        
+        # Calculate support and resistance levels if requested
+        support_levels = []
+        resistance_levels = []
+        if show_support_resistance:
+            # Use only recent months (last 6 months) for support/resistance calculation
+            recent_months = 6
+            cutoff_date = end_date - timedelta(days=recent_months * 30)
+            
+            # Handle timezone-aware index: normalize both to same timezone
+            if data.index.tz is not None:
+                # Convert cutoff_date to pandas Timestamp with same timezone as data index
+                cutoff_date = pd.Timestamp(cutoff_date, tz=data.index.tz)
+            else:
+                # Ensure cutoff_date is timezone-naive
+                cutoff_date = pd.Timestamp(cutoff_date)
+            
+            recent_data = data[data.index >= cutoff_date]
+            
+            # Only calculate if we have enough recent data
+            if len(recent_data) > 10:
+                # Adjust window based on timeframe
+                if timeframe == "Daily":
+                    window = 20
+                elif timeframe == "Weekly":
+                    window = 10
+                else:  # Monthly
+                    window = 5
+                
+                support_levels, resistance_levels = calculate_support_resistance(recent_data, window=window, num_levels=5)
         
         # Create candlestick chart with reduced volume chart height
         fig = make_subplots(
@@ -483,6 +584,32 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=N
                         ),
                         row=1, col=1
                     )
+        
+        # Add support and resistance levels if requested
+        if show_support_resistance and (support_levels or resistance_levels):
+            # Add support levels (green dashed lines)
+            for level in support_levels:
+                fig.add_hline(
+                    y=level,
+                    line_dash="dash",
+                    line_color="rgba(0, 255, 0, 0.6)",
+                    line_width=1.5,
+                    annotation_text=f"Support ${level:.2f}",
+                    annotation_position="right",
+                    row=1, col=1
+                )
+            
+            # Add resistance levels (red dashed lines)
+            for level in resistance_levels:
+                fig.add_hline(
+                    y=level,
+                    line_dash="dash",
+                    line_color="rgba(255, 0, 0, 0.6)",
+                    line_width=1.5,
+                    annotation_text=f"Resistance ${level:.2f}",
+                    annotation_position="right",
+                    row=1, col=1
+                )
         
         # Add volume chart
         fig.add_trace(

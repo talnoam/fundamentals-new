@@ -79,6 +79,14 @@ if sma_150:
 if sma_200:
     sma_periods.append(200)
 
+# Support and Resistance levels
+st.sidebar.markdown("---")
+show_support_resistance = st.sidebar.checkbox(
+    "Show Support & Resistance Levels",
+    value=False,
+    help="Automatically calculate and display support (green) and resistance (red) levels"
+)
+
 # Update session state
 st.session_state.current_ticker = ticker
 st.session_state.current_years = years
@@ -105,7 +113,13 @@ if ticker:
     with st.spinner("Loading chart..."):
         # Pass SMA periods if any are selected
         sma_list = sma_periods if sma_periods else None
-        fig = create_candlestick_chart(ticker, years, timeframe, sma_periods=sma_list)
+        fig = create_candlestick_chart(
+            ticker, 
+            years, 
+            timeframe, 
+            sma_periods=sma_list,
+            show_support_resistance=show_support_resistance
+        )
         if fig is not None:
             st.plotly_chart(fig, use_container_width=True)
         else:
