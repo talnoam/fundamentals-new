@@ -515,18 +515,63 @@ def _classify_equity_index(close, ma50, ma200, rsi):
 
 def _classify_btc(close, ma50, ma200, rsi):
     """
-    Classify Bitcoin state. Returns (state, score, comment).
+    Classify Bitcoin state using trend (MAs) + RSI.
+    Returns (state, score, comment).
+
+    score:
+      +2  = Bullish & strong momentum
+      +1  = Bullish
+       0  = Neutral / mixed
+      -1  = Bearish
     """
     if ma200 is None:
         return "Data Insufficient", 0, "Not enough data for 200-day MA"
 
+    # default if RSI missing
+    rsi_val = rsi if rsi is not None else 50
+
+    # 🔹 Bullish + healthy momentum
     if ma50 is not None and close > ma50 and ma50 >= ma200:
-        return "Bullish", 1, "BTC in uptrend – supports risk-on sentiment"
+        if 55 <= rsi_val <= 70:
+            return (
+                "Bullish (Strong Momentum)",
+                2,
+                "BTC in clear uptrend with healthy momentum – supports strong risk-on sentiment",
+            )
+        elif rsi_val > 70:
+            return (
+                "Bullish (Overbought)",
+                1,
+                "BTC in strong uptrend but RSI overbought – risk of short-term shakeouts/FOMO spikes",
+            )
+        else:
+            return (
+                "Bullish",
+                1,
+                "BTC above 50 & 200 MA – trend up, momentum moderate",
+            )
 
+    # 🔻 Bearish – below 200
     if close < ma200:
-        return "Bearish", -1, "BTC below 200 MA – risk appetite weakening"
+        if rsi_val < 45:
+            return (
+                "Bearish",
+                -1,
+                "BTC below 200 MA with weak momentum – supports risk-off / cautious stance",
+            )
+        else:
+            return (
+                "Bearish (Stabilizing)",
+                -1,
+                "BTC below 200 MA but momentum not extremely weak – could be basing, still risk-off bias",
+            )
 
-    return "Neutral", 0, "BTC in range/transition"
+    # ⚪ intermediate zone
+    return (
+        "Neutral / Range",
+        0,
+        "BTC between key MAs – range / transition phase, no clear signal for risk sentiment",
+    )
 
 
 def _classify_tnx(close, ma50, ma200):
