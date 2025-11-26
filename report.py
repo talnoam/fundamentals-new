@@ -460,24 +460,42 @@ def calculate_support_resistance(data, window=20, num_levels=5):
         return [], []
 
 # Function to create candlestick chart
-def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=None, show_support_resistance=False):
+def create_candlestick_chart(ticker, years_to_estimate=None, timeframe="Daily", sma_periods=None, show_support_resistance=False, period_option=None):
     """
     Create a candlestick chart with optional SMA indicators and support/resistance levels.
     
     Args:
         ticker (str): Stock ticker symbol
-        years_to_estimate (int): Number of years of historical data
+        years_to_estimate (int, optional): Number of years of historical data (if period_option is "Custom Years")
         timeframe (str): "Daily", "Weekly", or "Monthly"
         sma_periods (list): List of SMA periods to display (e.g., [20, 50, 150, 200])
         show_support_resistance (bool): Whether to show automatic support and resistance levels
+        period_option (str, optional): Predefined period ("1 Day", "7 Days", "1 Month", "6 Months", "Year to Date")
     
     Returns:
         plotly.graph_objects.Figure: The chart figure
     """
     try:
-        # Calculate the period based on years_to_estimate
+        # Calculate the period based on period_option or years_to_estimate
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=years_to_estimate * 365)
+        
+        if period_option:
+            if period_option == "1 Day":
+                start_date = end_date - timedelta(days=1)
+            elif period_option == "7 Days":
+                start_date = end_date - timedelta(days=7)
+            elif period_option == "1 Month":
+                start_date = end_date - timedelta(days=30)
+            elif period_option == "6 Months":
+                start_date = end_date - timedelta(days=180)
+            elif period_option == "Year to Date":
+                start_date = datetime(end_date.year, 1, 1)
+            else:
+                # Fallback to years_to_estimate
+                start_date = end_date - timedelta(days=years_to_estimate * 365)
+        else:
+            # Use years_to_estimate if no period_option provided
+            start_date = end_date - timedelta(days=years_to_estimate * 365)
         
         # Download stock data
         stock = yf.Ticker(ticker)
@@ -648,4 +666,134 @@ def create_candlestick_chart(ticker, years_to_estimate, timeframe, sma_periods=N
         
     except Exception as e:
         st.error(f"Error creating chart: {str(e)}")
+        return None
+
+def create_multi_indicator_chart(tickers_dict, years_to_estimate=None, timeframe="Daily", normalize=False, period_option=None):
+    """
+    Create a chart with multiple market indicators on the same graph.
+    
+    Args:
+        tickers_dict (dict): Dictionary mapping display names to ticker symbols
+        years_to_estimate (int, optional): Number of years of historical data (if period_option is "Custom Years")
+        timeframe (str): "Daily", "Weekly", or "Monthly"
+        normalize (bool): Whether to normalize all indicators to percentage change from start
+        period_option (str, optional): Predefined period ("1 Day", "7 Days", "1 Month", "6 Months", "Year to Date")
+    
+    Returns:
+        plotly.graph_objects.Figure: The chart figure
+    """
+    try:
+        import plotly.graph_objects as go
+        from plotly.subplots import make_subplots
+        
+        # Calculate the period based on period_option or years_to_estimate
+        end_date = datetime.now()
+        
+        if period_option:
+            if period_option == "1 Day":
+                start_date = end_date - timedelta(days=1)
+            elif period_option == "7 Days":
+                start_date = end_date - timedelta(days=7)
+            elif period_option == "1 Month":
+                start_date = end_date - timedelta(days=30)
+            elif period_option == "6 Months":
+                start_date = end_date - timedelta(days=180)
+            elif period_option == "Year to Date":
+                start_date = datetime(end_date.year, 1, 1)
+            else:
+                # Fallback to years_to_estimate
+                start_date = end_date - timedelta(days=years_to_estimate * 365)
+        else:
+            # Use years_to_estimate if no period_option provided
+            start_date = end_date - timedelta(days=years_to_estimate * 365)
+        
+        # Get different intervals based on timeframe
+        if timeframe == "Daily":
+            interval = "1d"
+        elif timeframe == "Weekly":
+            interval = "1wk"
+        else:  # Monthly
+            interval = "1mo"
+        
+        # Download data for all tickers
+        all_data = {}
+        for name, ticker in tickers_dict.items():
+            try:
+                stock = yf.Ticker(ticker)
+                data = stock.history(
+                    start=start_date,
+                    end=end_date,
+                    interval=interval
+                )
+                if not data.empty:
+                    all_data[name] = data
+            except Exception as e:
+                st.warning(f"Could not load data for {name} ({ticker}): {str(e)}")
+        
+        if not all_data:
+            st.error("No data available for selected indicators")
+            return None
+        
+        # Create figure
+        fig = go.Figure()
+        
+        # Color palette for different indicators
+        colors = [
+            '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+            '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+            '#aec7e8', '#ffbb78'
+        ]
+        
+        # Plot each indicator
+        for idx, (name, data) in enumerate(all_data.items()):
+            color = colors[idx % len(colors)]
+            
+            if normalize:
+                # Normalize to percentage change from first value
+                first_value = data['Close'].iloc[0]
+                normalized_close = ((data['Close'] - first_value) / first_value) * 100
+                y_values = normalized_close
+                y_label = "Percentage Change (%)"
+            else:
+                y_values = data['Close']
+                y_label = "Price"
+            
+            fig.add_trace(
+                go.Scatter(
+                    x=data.index,
+                    y=y_values,
+                    mode='lines',
+                    name=name,
+                    line=dict(color=color, width=2),
+                    hovertemplate=f'<b>{name}</b><br>' +
+                                  'Date: %{x}<br>' +
+                                  f'{y_label}: %{{y:.2f}}<extra></extra>'
+                )
+            )
+        
+        # Update layout
+        fig.update_layout(
+            height=600,
+            title_text=f"Market Indicators Comparison - {timeframe} View",
+            xaxis_title="Date",
+            yaxis_title=y_label,
+            hovermode='x unified',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            template="plotly_white"
+        )
+        
+        # Add grid
+        fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"Error creating multi-indicator chart: {str(e)}")
         return None
