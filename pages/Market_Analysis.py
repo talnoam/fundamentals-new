@@ -1,12 +1,17 @@
 import streamlit as st
 import sys
 from pathlib import Path
+import pandas as pd
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the chart functions from report.py
-from report import create_candlestick_chart, create_multi_indicator_chart
+from report import (
+    create_candlestick_chart,
+    create_multi_indicator_chart,
+    analyze_market_environment,
+)
 
 # Configure Streamlit page
 st.set_page_config(
@@ -211,6 +216,45 @@ if selected_indicator_names:
                 st.error("Unable to load chart data")
 else:
     st.info("👈 Please select one or more market indicators from the sidebar to view the chart")
+
+# --- Automated Market Environment Summary ---
+st.divider()
+st.header("🧭 Automated Market Environment")
+
+with st.spinner("Analyzing overall market environment..."):
+    env = analyze_market_environment()
+
+if env:
+    col1, col2 = st.columns([1, 3])
+
+    with col1:
+        st.metric(
+            "Overall Environment",
+            env["environment"],
+            delta=f"Score: {env['total_score']}",
+        )
+
+    with col2:
+        st.write(
+            "Summary based on trend (price vs. 50/200 MA), RSI, yields, dollar strength and volatility."
+        )
+
+    # Build table of per-indicator states
+    indicators_df = pd.DataFrame(
+        [
+            {
+                "Indicator": d["indicator"],
+                "Ticker": d["ticker"],
+                "State": d["state"],
+                "Score": d["score"],
+                "Comment": d["comment"],
+            }
+            for d in env["indicators"]
+        ]
+    )
+
+    st.subheader("Market State by Indicator")
+    st.dataframe(indicators_df, use_container_width=True)
 
 # Footer
 st.divider()

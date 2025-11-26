@@ -31,6 +31,7 @@ import streamlit as st
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
+import numpy as np
 
 from report_utils import (
     get_next_year_growth_rate, 
@@ -458,6 +459,284 @@ def calculate_support_resistance(data, window=20, num_levels=5):
         return support, resistance
     except Exception:
         return [], []
+
+def _compute_rsi(close_series, period: int = 14) -> pd.Series:
+    """
+    Compute RSI (Relative Strength Index) for a price series.
+    """
+    delta = close_series.diff()
+    gain = delta.where(delta > 0, 0.0)
+    loss = -delta.where(delta < 0, 0.0)
+
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def _safe_ma(close_series, period: int):
+    """
+    Return last moving average value for given period or None if not enough data.
+    """
+    if len(close_series) < period:
+        return None
+    return close_series.rolling(window=period).mean().iloc[-1]
+
+
+def _classify_equity_index(close, ma50, ma200, rsi):
+    """
+    Classify equity index state (GSPC, NDX, RUT, DJI, MAGS).
+    Returns (state_str, score, comment).
+    """
+    if ma200 is None:
+        return "Data Insufficient", 0, "Not enough data for 200-day MA"
+
+    # Strong bullish
+    if ma50 is not None and close > ma50 and ma50 >= ma200 and (rsi is None or rsi >= 55):
+        return "Bullish", 2, "Price above 50 & 200 MA with positive momentum"
+
+    # Bullish but in correction / consolidation
+    if close > ma200 and ma50 is not None and close <= ma50 and 45 <= (rsi or 50) <= 60:
+        return "Bullish (Correction)", 1, "Above 200 MA but consolidating near 50 MA"
+
+    # Neutral around 200 MA
+    if abs(close - ma200) / ma200 <= 0.03:
+        return "Neutral", 0, "Price trading around 200 MA – indecision zone"
+
+    # Bearish below 200 MA
+    if close < ma200:
+        return "Bearish", -2, "Price below 200 MA – higher downside risk"
+
+    # Fallback
+    return "Neutral", 0, "Mixed signals"
+
+
+def _classify_btc(close, ma50, ma200, rsi):
+    """
+    Classify Bitcoin state. Returns (state, score, comment).
+    """
+    if ma200 is None:
+        return "Data Insufficient", 0, "Not enough data for 200-day MA"
+
+    if ma50 is not None and close > ma50 and ma50 >= ma200:
+        return "Bullish", 1, "BTC in uptrend – supports risk-on sentiment"
+
+    if close < ma200:
+        return "Bearish", -1, "BTC below 200 MA – risk appetite weakening"
+
+    return "Neutral", 0, "BTC in range/transition"
+
+
+def _classify_tnx(close, ma50, ma200):
+    """
+    Classify 10-year yield (TNX). close ≈ yield * 10 (e.g. 40 → 4%).
+    Returns (state, score, comment).
+    """
+    yield_pct = close / 10.0 if close is not None else None
+
+    if yield_pct is None or ma50 is None or ma200 is None:
+        return "Data Insufficient", 0, "Not enough data for TNX moving averages"
+
+    high_yield = yield_pct >= 4.0
+    low_yield = yield_pct <= 3.0
+
+    if high_yield and close > ma50 and ma50 >= ma200:
+        return "High & Rising", -2, "High and rising 10Y yield – pressure on growth stocks"
+
+    if low_yield and (close < ma50 or ma50 < ma200):
+        return "Falling / Low", 1, "Lower yields – supportive for risk assets"
+
+    return "Stable", 0, "10Y yield relatively stable"
+
+
+def _classify_dxy(close, ma50, ma200):
+    """
+    Classify US Dollar Index. Returns (state, score, comment).
+    """
+    if ma50 is None or ma200 is None:
+        return "Data Insufficient", 0, "Not enough data for DXY moving averages"
+
+    if close > ma50 and ma50 >= ma200:
+        return "Dollar Strong", -1, "Strong dollar – can pressure global risk assets & commodities"
+
+    if close < ma50 and ma50 <= ma200:
+        return "Dollar Weak", 1, "Weakening dollar – supportive for EM, commodities & global equities"
+
+    return "Neutral", 0, "Dollar trend mixed"
+
+
+def _classify_crude(close, ma50, ma200):
+    """
+    Classify Crude Oil trend. Returns (state, score, comment).
+    Score is small because it's more of an inflation risk indicator.
+    """
+    if ma50 is None or ma200 is None:
+        return "Data Insufficient", 0, "Not enough data for oil moving averages"
+
+    if close > ma50 and ma50 >= ma200:
+        return "Rising Oil", -1, "Strong oil trend – potential inflation pressure"
+
+    if close < ma200:
+        return "Soft Oil", 0, "Oil weak/soft – less inflation pressure from energy"
+
+    return "Neutral", 0, "Oil trend mixed"
+
+
+def _classify_gold_silver(close, ma50, ma200, label="Gold"):
+    """
+    Classify Gold/Silver trend (no direct risk score).
+    """
+    if ma50 is None or ma200 is None:
+        return "Data Insufficient", 0, f"Not enough data for {label} moving averages"
+
+    if close > ma50 and ma50 >= ma200:
+        return "Uptrend", 0, f"{label} in uptrend – may reflect risk-off / inflation hedge demand"
+
+    if close < ma200:
+        return "Downtrend", 0, f"{label} weak – reduced demand for safe haven / industrial usage"
+
+    return "Neutral", 0, f"{label} trend mixed"
+
+
+def _classify_vix(close):
+    """
+    Classify VIX level (volatility / fear).
+    Returns (state, score, comment).
+    """
+    if close is None:
+        return "Data Insufficient", 0, "No VIX value"
+
+    if close < 13:
+        return "Complacent (Very Low VIX)", 1, "Very low volatility – risk-on but with complacency risk"
+
+    if 13 <= close <= 20:
+        return "Normal Volatility", 0, "Volatility in normal range"
+
+    if 20 < close <= 30:
+        return "Elevated Volatility", -1, "Market nervous – volatility elevated"
+
+    return "High / Panic Volatility", -2, "High VIX – panic / stress environment"
+
+
+def analyze_market_environment():
+    """
+    Analyze the overall market environment using key indicators:
+    - Equities: GSPC, NDX, RUT, DJI, MAGS
+    - Crypto: BTC-USD
+    - Rates: TNX
+    - Commodities: Crude, Gold, Silver
+    - Volatility: VIX
+    - FX: US Dollar Index
+
+    Returns:
+        dict with:
+            - indicators: list of per-indicator dicts
+            - total_score: summed score
+            - environment: textual label
+    """
+    # Fixed lookback for state analysis: ~1 year
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
+
+    indicator_map = {
+        "S&P 500 (GSPC)": "^GSPC",
+        "NASDAQ 100 (NDX)": "^NDX",
+        "Russell 2000 (RUT)": "^RUT",
+        "Dow Jones (DJI)": "^DJI",
+        "Magnificent 7 (MAGS)": "MAGS",
+        "Bitcoin (BTC-USD)": "BTC-USD",
+        "10-Year Treasury (TNX)": "^TNX",
+        "Crude Oil": "CL=F",
+        "Gold": "GC=F",
+        "Silver": "SI=F",
+        "VIX (Volatility Index)": "^VIX",
+        "US Dollar Index": "DX-Y.NYB",
+    }
+
+    results = []
+
+    for name, ticker in indicator_map.items():
+        try:
+            data = yf.Ticker(ticker).history(
+                start=start_date,
+                end=end_date,
+                interval="1d"
+            )
+            if data.empty:
+                results.append({
+                    "indicator": name,
+                    "ticker": ticker,
+                    "state": "No Data",
+                    "score": 0,
+                    "comment": "No historical data loaded",
+                })
+                continue
+
+            close = data["Close"].iloc[-1]
+            ma50 = _safe_ma(data["Close"], 50)
+            ma200 = _safe_ma(data["Close"], 200)
+            rsi_series = _compute_rsi(data["Close"], period=14)
+            rsi = rsi_series.dropna().iloc[-1] if not rsi_series.dropna().empty else None
+
+            # Classification per indicator type
+            if ticker in {"^GSPC", "^NDX", "^RUT", "^DJI", "MAGS"}:
+                state, score, comment = _classify_equity_index(close, ma50, ma200, rsi)
+            elif ticker == "BTC-USD":
+                state, score, comment = _classify_btc(close, ma50, ma200, rsi)
+            elif ticker == "^TNX":
+                state, score, comment = _classify_tnx(close, ma50, ma200)
+            elif ticker == "CL=F":
+                state, score, comment = _classify_crude(close, ma50, ma200)
+            elif ticker == "GC=F":
+                state, score, comment = _classify_gold_silver(close, ma50, ma200, label="Gold")
+            elif ticker == "SI=F":
+                state, score, comment = _classify_gold_silver(close, ma50, ma200, label="Silver")
+            elif ticker == "^VIX":
+                state, score, comment = _classify_vix(close)
+            elif ticker == "DX-Y.NYB":
+                state, score, comment = _classify_dxy(close, ma50, ma200)
+            else:
+                state, score, comment = "Unknown", 0, "No classification rule"
+
+            results.append({
+                "indicator": name,
+                "ticker": ticker,
+                "price": float(close),
+                "ma50": float(ma50) if ma50 is not None else None,
+                "ma200": float(ma200) if ma200 is not None else None,
+                "rsi": float(rsi) if rsi is not None else None,
+                "state": state,
+                "score": score,
+                "comment": comment,
+            })
+
+        except Exception as e:
+            results.append({
+                "indicator": name,
+                "ticker": ticker,
+                "state": "Error",
+                "score": 0,
+                "comment": f"Error fetching data: {e}",
+            })
+
+    # Calculate overall environment score
+    total_score = sum(item.get("score", 0) for item in results)
+
+    if total_score >= 4:
+        environment = "Bullish / Risk-On"
+    elif total_score <= -4:
+        environment = "Bearish / Risk-Off"
+    else:
+        environment = "Mixed / Sideways"
+
+    return {
+        "indicators": results,
+        "total_score": total_score,
+        "environment": environment,
+    }
+
 
 # Function to create candlestick chart
 def create_candlestick_chart(ticker, years_to_estimate=None, timeframe="Daily", sma_periods=None, show_support_resistance=False, period_option=None):
