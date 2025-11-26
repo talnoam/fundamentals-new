@@ -8,6 +8,7 @@ A comprehensive multi-page Streamlit application for investment analysis, featur
   - Landing page with dashboard overview
   - Fundamentals Dashboard for comprehensive company analysis
   - Technical Analysis Dashboard for price chart analysis
+  - Market Analysis Dashboard for market indicators and economic data
 - **Interactive Dashboards**: User-friendly interfaces for analyzing any stock ticker
 - **Comprehensive Stock Selection**:
   - Dropdown selection from S&P 500, NASDAQ-100, and Dow Jones companies
@@ -25,6 +26,16 @@ A comprehensive multi-page Streamlit application for investment analysis, featur
   - Volume analysis charts
   - Multiple timeframes: Daily, Weekly, Monthly
   - Historical data visualization (1-10 years)
+  - SMA indicators (20, 50, 150, 200 periods)
+  - Automatic support and resistance level detection
+  - Support/resistance calculated from recent 6 months of data
+- **Market Analysis**:
+  - 12+ market indicators (Bitcoin, S&P 500, NASDAQ, Dow Jones, VIX, etc.)
+  - Compare multiple indicators on the same chart
+  - Flexible time periods: 1 Day, 7 Days, 1 Month, 6 Months, Year to Date, or Custom (1-10 years)
+  - Normalization option for comparing indicators with different price scales
+  - Commodities: Gold, Silver, Crude Oil
+  - Economic indicators: VIX, 10-Year Treasury, US Dollar Index
 - **Interactive Price Charts**:
   - Interactive zoom, pan, and hover functionality
   - Chart data spans the analysis period
@@ -64,7 +75,8 @@ The application will open in your browser at `http://localhost:8501`
 The application uses Streamlit's built-in multi-page navigation:
 - **Landing Page** (`app.py`): Welcome page with dashboard overview
 - **Fundamentals Dashboard** (`pages/Fundamentals.py`): Comprehensive fundamental analysis
-- **Technical Analysis Dashboard** (`pages/Technical_Analysis.py`): Price chart analysis
+- **Technical Analysis Dashboard** (`pages/Technical_Analysis.py`): Price chart analysis with technical indicators
+- **Market Analysis Dashboard** (`pages/Market_Analysis.py`): Market indicators and economic data analysis
 
 Navigate between pages using the sidebar menu that appears automatically in multi-page Streamlit apps.
 
@@ -101,20 +113,52 @@ The landing page provides an overview of available dashboards and getting starte
    - Or enter any custom ticker symbol
 3. **Set Parameters**: 
    - Adjust years of historical data (1-10 years)
-4. **View Charts**:
+4. **Technical Indicators** (Optional):
+   - Enable SMA indicators: 20, 50, 150, or 200 periods
+   - Toggle support and resistance levels (calculated from recent 6 months)
+5. **View Charts**:
    - Interactive candlestick price charts with volume
    - Switch between Daily, Weekly, and Monthly timeframes
    - Analyze price movements and trading volume patterns
+   - Overlay SMA lines and support/resistance levels
    - Charts update automatically based on your selected parameters
+
+#### Market Analysis Dashboard
+1. **Navigate**: Select "Market_Analysis" from the sidebar menu
+2. **Select Market Indicators**: 
+   - Choose one or more indicators from the list:
+     - Stock Indices: S&P 500, NASDAQ Composite, NASDAQ 100, Russell 2000, Dow Jones
+     - Cryptocurrency: Bitcoin
+     - Commodities: Gold, Silver, Crude Oil
+     - Economic Indicators: VIX, 10-Year Treasury, US Dollar Index
+3. **Set Time Period**: 
+   - Quick periods: 1 Day, 7 Days, 1 Month, 6 Months, Year to Date
+   - Or select "Custom Years" for 1-10 years
+4. **View Charts**:
+   - **Single Indicator**: Full candlestick chart with SMA and support/resistance options
+   - **Multiple Indicators**: Comparison line chart with normalization option
+   - Normalize to percentage change for comparing indicators with different price scales
+   - Switch between Daily, Weekly, and Monthly timeframes
 
 ### Chart Features
 
 - **Candlestick Charts**: Visual representation of price movements with open, high, low, and close prices
 - **Volume Analysis**: Bar chart showing trading volume for correlation with price movements
 - **Timeframe Options**:
-  - **Daily**: Best for short-term analysis (limited to 1 year for performance)
-  - **Weekly**: Ideal for medium-term trend analysis (default)
+  - **Daily**: Best for short-term analysis
+  - **Weekly**: Ideal for medium-term trend analysis
   - **Monthly**: Perfect for long-term pattern recognition
+- **Technical Indicators**:
+  - **SMA (Simple Moving Averages)**: 20, 50, 150, and 200 period moving averages
+  - **Support & Resistance Levels**: Automatically calculated from recent price action (last 6 months)
+  - Color-coded indicators for easy identification
+- **Multi-Indicator Comparison**:
+  - Compare multiple market indicators on the same chart
+  - Normalization option shows percentage change from start date
+  - Useful for analyzing correlations and relative performance
+- **Flexible Time Periods**:
+  - Quick access: 1 Day, 7 Days, 1 Month, 6 Months, Year to Date
+  - Custom range: 1-10 years
 - **Interactive Features**: Zoom, pan, hover for detailed data points
 - **Persistent State**: Analysis results remain visible when switching chart timeframes
 
@@ -130,8 +174,9 @@ python report.py
 
 - `app.py`: Main entry point and landing page for the multi-page application
 - `pages/Fundamentals.py`: Streamlit page for fundamental analysis with chart functionality
-- `pages/Technical_Analysis.py`: Streamlit page for technical analysis and price charts
-- `report.py`: Core analysis logic and candlestick chart creation
+- `pages/Technical_Analysis.py`: Streamlit page for technical analysis with SMA and support/resistance indicators
+- `pages/Market_Analysis.py`: Streamlit page for market indicators and economic data analysis
+- `report.py`: Core analysis logic, candlestick chart creation, and multi-indicator chart functions
 - `report_utils.py`: Financial calculations, data fetching, and ticker management
 
 ## Investment Methodology

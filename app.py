@@ -29,12 +29,23 @@ Price chart analysis and technical indicators:
 - Interactive candlestick charts
 - Volume analysis
 - Multiple timeframes (Daily, Weekly, Monthly)
-- Historical price data visualization
+- SMA indicators (20, 50, 150, 200 periods)
+- Automatic support and resistance levels
+- Historical price data visualization (1-10 years)
+
+### 🌍 Market Analysis Dashboard
+Comprehensive market indicators and economic data analysis:
+- Multiple market indicators (Bitcoin, S&P 500, NASDAQ, Dow Jones, etc.)
+- Compare multiple indicators on the same chart
+- Flexible time periods (1 Day, 7 Days, 1 Month, 6 Months, Year to Date, or Custom)
+- Normalization option for comparing indicators with different price scales
+- Commodities (Gold, Silver, Crude Oil)
+- Economic indicators (VIX, Treasury yields, Dollar Index)
 
 ## Getting Started
 
 1. **Select a Dashboard** from the sidebar navigation menu
-2. **Choose a Stock** ticker symbol
+2. **Choose a Stock/Indicator** ticker symbol or market indicator
 3. **Configure Parameters** and analyze!
 
 ---
@@ -44,7 +55,7 @@ Always do your own research and consult with a financial advisor.
 """)
 
 # Add some visual elements
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric("Fundamentals", "Analysis", "📊")
@@ -53,5 +64,8 @@ with col2:
     st.metric("Technical", "Analysis", "📈")
 
 with col3:
+    st.metric("Market", "Analysis", "🌍")
+
+with col4:
     st.metric("Real-time", "Data", "🔄")
 
