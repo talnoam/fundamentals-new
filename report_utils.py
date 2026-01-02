@@ -27,7 +27,7 @@ def get_sp500_tickers():
     resp.raise_for_status()
 
     tables = pd.read_html(resp.text)
-    sp500_df = tables[1]  # first table = S&P 500 constituents
+    sp500_df = tables[0]  # first table = S&P 500 constituents
 
     # yahoo_fin replaces '.' with '-' in tickers
     return sp500_df["Symbol"].str.replace(".", "-", regex=False).tolist()
