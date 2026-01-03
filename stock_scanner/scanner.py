@@ -121,7 +121,6 @@ if __name__ == "__main__":
     provider = TickerProvider(cache_expiry_days=1)
 
     # fetch all the tickers (S&P 500, Dow, Nasdaq)
-    # note: Nasdaq alone has 5,000 stocks, maybe you want to start with only S&P 500 for testing
-    tickers_to_scan = provider.get_all_tickers(include_nasdaq=False, include_sp500=True, include_dow=False)
+    tickers_to_scan = provider.get_all_tickers(include_nasdaq=True, include_sp500=True, include_dow=True)
     
     scanner.scan(tickers_to_scan)
