@@ -1,0 +1,16 @@
+filters:
+  min_market_cap: 2000000000  # 2B
+  sma_period: 150
+  max_slope: -0.002           # negative slope is still/strong (depending on the strategy)
+  batch_size: 50
+
+patterns:
+  extrema_order: 5
+  min_points: 3
+  convergence_threshold: 0.15
+
+data:
+  cache_dir: ".cache/historical_data"
+  cache_expiry_hours: 12
+  default_period: "1y"
+  default_interval: "1d"
