@@ -11,7 +11,8 @@ class ScoringEngine:
             'quality': 0.3,
             'compression': 0.3,
             'volume': 0.2,
-            'breakout_strength': 0.2
+            'breakout_strength': 0.1,
+            'freshness': 0.1
         })
 
     def calculate_score(self, df: pd.DataFrame, pattern: dict) -> float:
@@ -44,12 +45,18 @@ class ScoringEngine:
             raw_strength = pattern.get('breakout_strength', 0)
             strength_score = max(0, min(1, raw_strength / 0.03)) if pattern['is_breaking_out'] else 0
 
+            # 5. Freshness Score (Bonus for the first day)
+            age = pattern.get('breakout_age', 0)
+            # The first day gets 1.0, the second day gets 0.7, the rest get 0
+            freshness_score = 1.0 if age == 1 else 0.7 if age == 2 else 0.0
+
             # Final calculation
             final_score = (
                 quality_score * self.weights['quality'] +
                 compression_score * self.weights['compression'] +
                 volume_score * self.weights['volume'] +
-                strength_score * self.weights['breakout_strength']
+                strength_score * self.weights['breakout_strength'] +
+                freshness_score * self.weights['freshness']
             ) * 100
 
             return round(final_score, 2)
@@ -64,6 +71,8 @@ class ScoringEngine:
         """
         # If the Detector didn't return R², we'll use a default value
         r2_high = pattern.get('r2_high', 0)
+        if r2_high < 0.5:
+            return 0.0
         r2_low = pattern.get('r2_low', 0)
         
         # Weighted average of the quality of the lines

@@ -31,7 +31,11 @@ class PatternDetector:
 
         # 2. Fitting trend lines (linear regression).
         # Resistance line (highs).
-        model_high = LinearRegression().fit(high_idx.reshape(-1, 1), df['High'].values[high_idx])
+
+        # Creating weights - the higher the index (newer), the weight increases
+        weights = np.linspace(1, 5, len(high_idx)) # The last peak is 5 times more important than the first one
+
+        model_high = LinearRegression().fit(high_idx.reshape(-1, 1), df['High'].values[high_idx], sample_weight=weights)
         r2_high = model_high.score(high_idx.reshape(-1, 1), df['High'].values[high_idx])
         slope_high = model_high.coef_[0]
         intercept_high = model_high.intercept_
@@ -63,16 +67,27 @@ class PatternDetector:
         if len(prices) < 2:
             return {'is_converging': False}
 
-        # Calculating the resistance values (red) at the current and previous time points
+        # Calculating the resistance value (red) at the last time point
         res_current = model_high.predict([[last_idx]])[0]
-        res_prev = model_high.predict([[prev_idx]])[0]
         
         # Getting the closing prices of the last two days
         close_current = prices[-1]
         close_prev = prices[-2]
 
-        # Breakout conditions: today and yesterday's closing price are above the trend line
-        is_breaking_out = (close_current > res_current) and (close_prev > res_prev)
+        # --- Logic of "Fresh Breakout" ---
+        consecutive_above = 0
+        
+        # Scanning from the end to the beginning to count how many days closed above the red line
+        for i in range(last_idx, -1, -1):
+            res_val = model_high.predict([[i]])[0]
+            if prices[i] > res_val:
+                consecutive_above += 1
+            else:
+                # Once we encounter a day below the line, stop the count
+                break
+        
+        # Definition: a relevant breakout is only one that has exactly 1 or 2 days above the line
+        is_breaking_out = 1 <= consecutive_above <= 2
 
         # Calculating the support values (green) at the current and previous time points
         sup_current = model_low.predict([[last_idx]])[0]
@@ -87,6 +102,7 @@ class PatternDetector:
         return {
             'is_converging': is_converging,
             'is_breaking_out': is_breaking_out,
+            'breakout_age': int(consecutive_above),
             'is_breaking_down': is_breaking_down,
             'breakout_strength': breakout_strength,
             'r2_high': r2_high,
