@@ -9,11 +9,13 @@ logger = logging.getLogger(__name__)
 class Visualizer:
     def __init__(self, config: dict):
         self.output_dir = config.get('output_dir', 'reports/charts')
+        self.sma_period = config.get('sma_period', 150)
+        self.show_plot = config.get('show_plot', False)
         # Create the output directory if it doesn't exist
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def create_chart(self, ticker: str, df: pd.DataFrame, pattern: dict, score: float, show_plot: bool = True):
+    def create_chart(self, ticker: str, df: pd.DataFrame, pattern: dict, score: float):
         """
         Creates an interactive chart with candlestick and trend lines, and saves it as an HTML file.
         """
@@ -29,7 +31,19 @@ class Visualizer:
             name=f'{ticker} Price'
         )])
 
-        # 2. Adding trend lines (if they exist in the detection results)
+        # 2. Adding a 150-day moving average (SMA)
+        # We calculate it here to ensure it is always updated based on the received DataFrame
+        sma_150 = df['Close'].rolling(window=self.sma_period).mean()
+
+        fig.add_trace(go.Scatter(
+            x=df.index,
+            y=sma_150,
+            mode='lines',
+            name=f'SMA {self.sma_period}',
+            line=dict(color='rgba(100, 149, 237, 0.9)', width=1.5) # Blue-ish color
+        ))
+
+        # 3. Adding trend lines (if they exist in the detection results)
         # We use different colors for the upper (resistance) and lower (support) lines
         if 'trendlines' in pattern:
             # Resistance line (red)
@@ -50,19 +64,24 @@ class Visualizer:
                 line=dict(color='rgba(50, 255, 50, 0.8)', width=2, dash='dash')
             ))
             
-        # 3. Adding an indication of the breakout (if it happened)
+        # 4. Adding an indication of the breakout (if it happened)
+        if pattern.get('is_breaking_down', False):
+            fig.add_annotation(
+                x=df.index[-1], y=df['Low'].iloc[-1],
+                text="⚠️ BEARISH BREAKDOWN",
+                showarrow=True, arrowhead=1, arrowcolor="red",
+                bgcolor="white", font=dict(color="red")
+            )
+
         if pattern.get('is_breaking_out', False):
-             # Adding an arrow or marking on the last candlestick
-             last_date = df.index[-1]
-             last_high = df['High'].iloc[-1]
              fig.add_annotation(
-                 x=last_date, y=last_high,
-                 text="BREAKOUT!",
-                 showarrow=True, arrowhead=1, arrowcolor="yellow",
-                 bgcolor="black", opacity=0.8
+                 x=df.index[-1], y=df['High'].iloc[-1],
+                 text="🚀 BULLISH BREAKOUT",
+                 showarrow=True, arrowhead=1, arrowcolor="gold",
+                 bgcolor="black", font=dict(color="gold")
              )
 
-        # 4. Designing the title and general layout
+        # 5. Designing the title and general layout
         today_str = datetime.now().strftime('%Y-%m-%d')
         # Building the title with all the important information
         title_text = (
@@ -82,7 +101,7 @@ class Visualizer:
             hovermode="x unified" # Simplifies data reading
         )
 
-        # 5. Saving to an HTML file
+        # 6. Saving to an HTML file
         filename = f"{ticker}_{today_str}_score_{int(score)}.html"
         file_path = os.path.join(self.output_dir, filename)
         fig.write_html(file_path)
@@ -90,5 +109,5 @@ class Visualizer:
         logger.info(f"Chart saved successfully to: {file_path}")
 
         # Optional: opening the chart in the browser immediately
-        if show_plot:
+        if self.show_plot:
             fig.show()

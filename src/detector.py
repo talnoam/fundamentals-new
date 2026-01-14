@@ -55,16 +55,41 @@ class PatternDetector:
         # Has the distance decreased significantly?
         compression = float(dist_end / dist_start) if dist_start != 0 else 1.0
 
-        # 4. Breakout detection.
-        current_price = prices[-1]
-        resistance_line = model_high.predict([[last_idx]])[0]
-        is_breaking_out = current_price > resistance_line
-
         is_converging = is_closing and compression < 0.7 # Example: a reduction of at least 30%.
+
+        # 4. Breakout detection.
+        last_idx = len(prices) - 1
+        prev_idx = last_idx - 1
+        
+        if len(prices) < 2:
+            return {'is_converging': False}
+
+        # Calculating the resistance values (red) at the current and previous time points
+        res_current = model_high.predict([[last_idx]])[0]
+        res_prev = model_high.predict([[prev_idx]])[0]
+        
+        # Getting the closing prices of the last two days
+        close_current = prices[-1]
+        close_prev = prices[-2]
+
+        # Breakout conditions: today and yesterday's closing price are above the trend line
+        is_breaking_out = (close_current > res_current) and (close_prev > res_prev)
+
+        # Calculating the support values (green) at the current and previous time points
+        sup_current = model_low.predict([[last_idx]])[0]
+        sup_prev = model_low.predict([[prev_idx]])[0]
+
+        # Detection of a breakdown (Breakdown)
+        is_breaking_down = (close_current < sup_current) and (close_prev < sup_prev)
+
+        # Bonus for Prod: calculating the percentage breakout above the line (we'll use this for the score)
+        breakout_strength = (close_current / res_current) - 1 if res_current > 0 else 0
 
         return {
             'is_converging': is_converging,
             'is_breaking_out': is_breaking_out,
+            'is_breaking_down': is_breaking_down,
+            'breakout_strength': breakout_strength,
             'r2_high': r2_high,
             'r2_low': r2_low,
             'slopes': (slope_high, slope_low),

@@ -18,6 +18,14 @@ class ScoringEngine:
         Calculates a final score between 0 and 100 for a breakout candidate.
         """
         try:
+            # If the stock broke down, we don't want to recommend it at all
+            if pattern.get('is_breaking_down', False):
+                return 0.0
+            
+            # If there is no breakout upwards, we can give a very low score or 0
+            if not pattern.get('is_breaking_out', False):
+                return 0.0
+
             # 1. Quality metric (R-squared) - how 'clean' the lines are
             # We check how close the extrema points are to the regression lines calculated in Detector
             quality_score = self._calculate_quality(pattern)

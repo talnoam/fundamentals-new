@@ -10,8 +10,8 @@ class FilterEngine:
     def __init__(self, config: dict):
         self.min_market_cap = config.get('min_market_cap', 2e9)  # default 2 billion
         self.sma_period = config.get('sma_period', 150)
-        self.slope_threshold = config.get('max_slope', -0.05) # negative slope is still/strong (depending on the strategy)
-        self.batch_size = config.get('batch_size', 100)
+        self.slope_threshold = config.get('max_slope', 0.0) # negative slope is still/strong (depending on the strategy)
+        self.batch_size = config.get('batch_size', 50)
 
     def apply_coarse_filters(self, tickers: List[str]) -> List[str]:
         """
@@ -47,7 +47,7 @@ class FilterEngine:
                         continue
 
                     # 2. calculate the moving average slope (SMA Slope)
-                    if self._is_slope_negative(df):
+                    if self._is_trend_bullish(df):
                         passed_tickers.append(ticker)
 
             except Exception as e:
@@ -56,21 +56,32 @@ class FilterEngine:
         logger.info(f"Filtering complete. {len(passed_tickers)} tickers passed.")
         return passed_tickers
 
-    def _is_slope_negative(self, df: pd.DataFrame) -> bool:
+    def _is_trend_bullish(self, df: pd.DataFrame) -> bool:
         """
-        calculates the slope of the SMA150 in the last 20 days.
+        Checks two accumulated conditions:
+        1. The current price is above the 150-day SMA.
+        2. The slope of the SMA is 0 or positive (not decreasing).
         """
         close = df['Close']
         sma = close.rolling(window=self.sma_period).mean()
         
-        # take the last 20 days of the SMA to measure the slope
+        # Checking that there is enough data for the calculation
         recent_sma = sma.dropna().tail(20)
         if len(recent_sma) < 20:
             return False
             
-        # simple linear regression to find the slope (normalize by price so the slope is in percentage)
+        # 1. Checking the position: the last closing price (close) is above the last SMA
+        current_price = close.iloc[-1]
+        current_sma = sma.iloc[-1]
+        
+        if current_price <= current_sma:
+            return False
+
+        # 2. Checking the slope (Regression on SMA)
+        # Normalizing the SMA so the slope is limited by the price
         x = np.arange(len(recent_sma))
-        y = recent_sma.values / recent_sma.values[0] # normalize
+        y = recent_sma.values / recent_sma.values[0]
         slope, _ = np.polyfit(x, y, 1)
         
-        return slope < self.slope_threshold
+        # The condition: slope is positive or zero
+        return slope >= self.slope_threshold

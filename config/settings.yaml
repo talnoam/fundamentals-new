@@ -1,7 +1,7 @@
 filters:
   min_market_cap: 2000000000  # 2B
   sma_period: 150
-  max_slope: -0.002           # negative slope is still/strong (depending on the strategy)
+  max_slope: 0
   batch_size: 50
 
 patterns:
@@ -18,3 +18,4 @@ data:
 visualization:
   output_dir: "reports/charts"
   top_n: 5 # How many charts to generate at the end of the run
+  show_plot: True
