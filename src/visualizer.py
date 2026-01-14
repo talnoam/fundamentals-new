@@ -46,23 +46,28 @@ class Visualizer:
         # 3. Adding trend lines (if they exist in the detection results)
         # We use different colors for the upper (resistance) and lower (support) lines
         if 'trendlines' in pattern:
+            upper = pattern['trendlines']['upper']
+            lower = pattern['trendlines']['lower']
+
             # Resistance line (red)
-            fig.add_trace(go.Scatter(
-                x=df.index,
-                y=pattern['trendlines']['upper'],
-                mode='lines',
-                name='Resistance (Upper)',
-                line=dict(color='rgba(255, 50, 50, 0.8)', width=2, dash='dash')
-            ))
+            if upper is not None:
+                fig.add_trace(go.Scatter(
+                    x=upper.index,
+                    y=upper.values,
+                    mode='lines',
+                    name='Resistance (Upper)',
+                    line=dict(color='rgba(255, 50, 50, 0.8)', width=2, dash='dash')
+                ))
 
             # Support line (green)
-            fig.add_trace(go.Scatter(
-                x=df.index,
-                y=pattern['trendlines']['lower'],
-                mode='lines',
-                name='Support (Lower)',
-                line=dict(color='rgba(50, 255, 50, 0.8)', width=2, dash='dash')
-            ))
+            if lower is not None:
+                fig.add_trace(go.Scatter(
+                    x=lower.index,
+                    y=lower.values,
+                    mode='lines',
+                    name='Support (Lower)',
+                    line=dict(color='rgba(50, 255, 50, 0.8)', width=2, dash='dash')
+                ))
             
         # 4. Adding an indication of the breakout (if it happened)
         if pattern.get('is_breaking_down', False):

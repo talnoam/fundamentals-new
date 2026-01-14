@@ -11,14 +11,42 @@ class PatternDetector:
         self.order = config.get('extrema_order', 5)  # How many days on each side of each point for it to be considered a peak.
         self.min_points = config.get('min_points', 3) # Minimum points for a trend line.
         self.convergence_threshold = config.get('convergence_threshold', 0.1) # Maximum distance at the end.
+        self.windows = [60, 90, 120, 160, 252]
 
     def analyze_convergence(self, df: pd.DataFrame) -> dict:
         """
+        Runs the detection on several time windows and selects the one with the highest R2.
+        """
+        # Initialize an empty result with all keys to avoid KeyErrors
+        best_result = {
+            'is_converging': False, 
+            'is_breaking_out': False,
+            'r2_high': -1.0,
+            'breakout_age': 0,
+            'trendlines': {'upper': None, 'lower': None}
+        }
+        
+        for window in self.windows:
+            if len(df) < window:
+                continue
+                
+            # Cutting the data to the specific window
+            df_slice = df.tail(window).copy()
+            result = self._find_pattern_in_window(df_slice)
+            
+            # We select the window with the highest R2 (highest confidence)
+            # and only if convergence and breakout were found
+            if result['is_converging'] and result['is_breaking_out']:
+                if result['r2_high'] > best_result['r2_high']:
+                    best_result = result
+                    best_result['used_window'] = window
+        
+        return best_result
+
+    def _find_pattern_in_window(self, df: pd.DataFrame) -> dict:
+        """
         Analyzes whether the stock chart is in a convergence process.
         """
-        if len(df) < 50:
-            return {'is_converging': False}
-
         prices = df['Close'].values
         x_axis = np.arange(len(prices))
 
@@ -27,90 +55,58 @@ class PatternDetector:
         low_idx = argrelextrema(df['Low'].values, np.less, order=self.order)[0]
 
         if len(high_idx) < self.min_points or len(low_idx) < self.min_points:
-            return {'is_converging': False}
+            return {'is_converging': False, 'is_breaking_out': False, 'r2_high': -1}
 
         # 2. Fitting trend lines (linear regression).
-        # Resistance line (highs).
 
-        # Creating weights - the higher the index (newer), the weight increases
+        # Resistance line (highs)
         weights = np.linspace(1, 5, len(high_idx)) # The last peak is 5 times more important than the first one
-
         model_high = LinearRegression().fit(high_idx.reshape(-1, 1), df['High'].values[high_idx], sample_weight=weights)
         r2_high = model_high.score(high_idx.reshape(-1, 1), df['High'].values[high_idx])
+
         slope_high = model_high.coef_[0]
         intercept_high = model_high.intercept_
+        upper_trendline = pd.Series(slope_high * x_axis + intercept_high, index=df.index)
 
         # Support line (lows).
         model_low = LinearRegression().fit(low_idx.reshape(-1, 1), df['Low'].values[low_idx])
         r2_low = model_low.score(low_idx.reshape(-1, 1), df['Low'].values[low_idx])
         slope_low = model_low.coef_[0]
         intercept_low = model_low.intercept_
+        lower_trendline = pd.Series(slope_low * x_axis + intercept_low, index=df.index)
 
-        # 3. Checking convergence conditions (mathematical conditions).
-        # a. The lines must get closer to each other.
-        # The upper slope must be smaller than the lower slope (for example, the upper is negative and the lower is positive).
-        is_closing = slope_high < slope_low
-
-        # b. Calculating the distance between the lines at the end of the period.
+        # 3. Checking convergence and compression
         first_extrema_idx = int(min(high_idx[0], low_idx[0]))
-        last_idx = len(prices) - 1
-        prev_idx = last_idx - 1
-        dist_start = (model_high.predict([[first_extrema_idx]]) - model_low.predict([[first_extrema_idx]]))[0]
-        dist_end = (model_high.predict([[last_idx]]) - model_low.predict([[last_idx]]))[0]
-        
-        # Has the distance decreased significantly?
+        dist_start = upper_trendline.iloc[first_extrema_idx] - lower_trendline.iloc[first_extrema_idx]
+        dist_end = upper_trendline.iloc[-1] - lower_trendline.iloc[-1]
         compression = float(dist_end / dist_start) if dist_start > 0 else 1.0
 
-        is_converging = is_closing and compression < 0.7 # Example: a reduction of at least 30%.
+        is_converging = (slope_high < slope_low) and (compression < 0.7) # Example: a reduction of at least 30%.
 
-        # 4. Breakout detection.        
-        if len(prices) < 2:
-            return {'is_converging': False}
-
-        # Calculating the resistance value (red) at the last time point
-        res_current = model_high.predict([[last_idx]])[0]
-        
-        # Getting the closing prices of the last two days
-        close_current = prices[-1]
-        close_prev = prices[-2]
-
-        # --- Logic of "Fresh Breakout" ---
+        # 4. Breakout detection (vectorized)
+        # Comparing all prices to the trend line in one go
+        is_above = (prices > upper_trendline.values)
         consecutive_above = 0
-        
-        # Scanning from the end to the beginning to count how many days closed above the red line
-        for i in range(last_idx, -1, -1):
-            res_val = model_high.predict([[i]])[0]
-            if prices[i] > res_val:
+        for val in reversed(is_above):
+            if val:
                 consecutive_above += 1
             else:
-                # Once we encounter a day below the line, stop the count
                 break
         
         # Definition: a relevant breakout is only one that has exactly 1 or 2 days above the line
         is_breaking_out = 1 <= consecutive_above <= 2
 
-        # Calculating the support values (green) at the current and previous time points
-        sup_current = model_low.predict([[last_idx]])[0]
-        sup_prev = model_low.predict([[prev_idx]])[0]
-
-        # Detection of a breakdown (Breakdown)
-        is_breaking_down = (close_current < sup_current) and (close_prev < sup_prev)
-
-        # Bonus for Prod: calculating the percentage breakout above the line (we'll use this for the score)
-        breakout_strength = (close_current / res_current) - 1 if res_current > 0 else 0
+        # Detection of a breakdown
+        is_breaking_down = (prices[-1] < lower_trendline.iloc[-1]) and (prices[-2] < lower_trendline.iloc[-2])
 
         return {
             'is_converging': is_converging,
             'is_breaking_out': is_breaking_out,
-            'breakout_age': int(consecutive_above),
             'is_breaking_down': is_breaking_down,
-            'breakout_strength': breakout_strength,
+            'breakout_age': int(consecutive_above),
+            'breakout_strength': float((prices[-1] / upper_trendline.iloc[-1]) - 1),
             'r2_high': r2_high,
             'r2_low': r2_low,
-            'slopes': (slope_high, slope_low),
-            'trendlines': {
-                'upper': (slope_high * x_axis + intercept_high),
-                'lower': (slope_low * x_axis + intercept_low)
-            },
+            'trendlines': {'upper': upper_trendline, 'lower': lower_trendline},
             'compression': compression
         }
