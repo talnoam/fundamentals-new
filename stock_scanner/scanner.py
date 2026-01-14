@@ -4,7 +4,7 @@ import pandas as pd
 import sys
 from pathlib import Path
 from typing import List, Dict, Any
-from concurrent.futures import ProcessPoolExecutor # for performance
+from concurrent.futures import ProcessPoolExecutor, as_completed # for performance
 
 # Add the parent directory to the Python path so we can import from src
 parent_dir = Path(__file__).parent.parent
@@ -31,11 +31,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger("StockScanner")
 
+# External helper function for parallel processing
+def analyze_single_ticker(ticker: str, data_engine, detector, scorer):
+    """
+    Runs the entire analysis for a single ticker. This function runs in a separate Process.
+    """
+    try:
+        df = data_engine.fetch_historical_data(ticker)
+        if df is None or df.empty:
+            return None
+
+        pattern_result = detector.analyze_convergence(df)
+        
+        # Only if there is a breakout (1-2 days above the line) and high quality, we calculate the score
+        if pattern_result.get('is_breaking_out') and pattern_result.get('r2_high', 0) >= 0.5:
+            score = scorer.calculate_score(df, pattern_result)
+            if score > 0:
+                return {
+                    'ticker': ticker,
+                    'data': df,
+                    'pattern': pattern_result,
+                    'score': score
+                }
+    except Exception as e:
+        # In Multiprocessing, it is important to catch errors so that the Pool does not crash
+        return None
+    return None
+
 class StockScanner:
     def __init__(self, config_path: str = "config/settings.yaml"):
         self.config = self._load_config(config_path)
-        
-        # initialize the different engines
         self.data_engine = DataEngine(self.config.get('data', {}))
         self.filter_engine = FilterEngine(self.config.get('filters', {}))
         self.detector = PatternDetector(self.config.get('patterns', {}))
@@ -64,34 +89,25 @@ class StockScanner:
         # step 2: graph analysis (the computationally heavy part)
         # here we use Parallel Processing in the ProcessPoolExecutor
         final_candidates = []
+
+        max_workers = self.config.get('performance', {}).get('max_workers', 8)
+
+        logger.info(f"Spawning Pool with {max_workers} workers...")
         
-        for ticker in raw_candidates:
-            try:
-                # fetch the historical data (OHLCV)
-                df = self.data_engine.fetch_historical_data(ticker)
-                
-                if df is None or df.empty:
-                    continue
-
-                # detect convergence
-                pattern_result = self.detector.analyze_convergence(df)
-                
-                if pattern_result['is_converging']:
-                    # score
-                    score = self.scorer.calculate_score(df, pattern_result)
-                    
-                    final_candidates.append({
-                        'ticker': ticker,
-                        'data': df,
-                        'pattern': pattern_result,
-                        'score': score
-                    })
-                    logger.info(f"Found valid pattern for {ticker} (Score: {score:.2f})")
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Sending all the tasks to the Pool
+            futures = {
+                executor.submit(analyze_single_ticker, ticker, self.data_engine, self.detector, self.scorer): ticker 
+                for ticker in raw_candidates
+            }
             
-            except Exception as e:
-                logger.error(f"Error analyzing {ticker}: {str(e)}")
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    final_candidates.append(result)
+                    logger.info(f"✅ Found valid pattern for {result['ticker']} (Score: {result['score']:.2f})")
 
-        # step 3: sorting by score
+        # Sorting by the weighted score (highest first)
         final_candidates.sort(key=lambda x: x['score'], reverse=True)
 
         # step 4: output and visualization
