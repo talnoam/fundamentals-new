@@ -110,7 +110,8 @@ class StockScanner:
             self.visualizer.create_chart(
                 candidate['ticker'], 
                 candidate['data'], 
-                candidate['pattern']
+                candidate['pattern'],
+                candidate['score']
             )
 
 if __name__ == "__main__":

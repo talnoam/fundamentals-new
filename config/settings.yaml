@@ -14,3 +14,7 @@ data:
   cache_expiry_hours: 12
   default_period: "1y"
   default_interval: "1d"
+
+visualization:
+  output_dir: "reports/charts"
+  top_n: 5 # How many charts to generate at the end of the run

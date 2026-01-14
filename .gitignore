@@ -7,3 +7,4 @@ __pycache__/
 .cursor/
 .cache/
 scanner.log
+reports/

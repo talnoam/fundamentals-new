@@ -53,7 +53,7 @@ class PatternDetector:
         dist_end = (model_high.predict([[last_idx]]) - model_low.predict([[last_idx]]))[0]
         
         # Has the distance decreased significantly?
-        compression = dist_end / dist_start if dist_start != 0 else 1
+        compression = float(dist_end / dist_start) if dist_start != 0 else 1.0
 
         # 4. Breakout detection.
         current_price = prices[-1]

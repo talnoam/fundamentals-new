@@ -48,8 +48,13 @@ class DataEngine:
                 logger.warning(f"No data returned for {ticker}")
                 return pd.DataFrame()
 
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+
             # Saving to the cache.
             df.to_parquet(cache_path)
+            
             return df
 
         except Exception as e:

@@ -38,7 +38,7 @@ class ScoringEngine:
                 volume_score * self.weights['volume']
             ) * 100
 
-            return round(final_score[0], 2)
+            return round(final_score, 2)
 
         except Exception as e:
             logger.error(f"Error in scoring: {e}")
@@ -62,11 +62,11 @@ class ScoringEngine:
         """
         Checks whether the current volume is higher than the average of the last 20 days.
         """
-        recent_volume = df['Volume'].values[-1][0]
-        avg_volume = df['Volume'].rolling(window=20).mean().values[-1][0]
+        recent_volume = df['Volume'].values[-1]
+        avg_volume = df['Volume'].rolling(window=20).mean().values[-1]
         
         if avg_volume == 0: return 0
         
         rel_vol = recent_volume / avg_volume
         # Normalization: if the volume is double the average, the score is 1. If it's half - 0.25.
-        return max(0, min(1, (rel_vol / 2)))
+        return float(max(0, min(1, (rel_vol / 2))))
