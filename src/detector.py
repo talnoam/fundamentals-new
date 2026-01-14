@@ -32,11 +32,13 @@ class PatternDetector:
         # 2. Fitting trend lines (linear regression).
         # Resistance line (highs).
         model_high = LinearRegression().fit(high_idx.reshape(-1, 1), df['High'].values[high_idx])
+        r2_high = model_high.score(high_idx.reshape(-1, 1), df['High'].values[high_idx])
         slope_high = model_high.coef_[0]
         intercept_high = model_high.intercept_
 
         # Support line (lows).
         model_low = LinearRegression().fit(low_idx.reshape(-1, 1), df['Low'].values[low_idx])
+        r2_low = model_low.score(low_idx.reshape(-1, 1), df['Low'].values[low_idx])
         slope_low = model_low.coef_[0]
         intercept_low = model_low.intercept_
 
@@ -63,6 +65,8 @@ class PatternDetector:
         return {
             'is_converging': is_converging,
             'is_breaking_out': is_breaking_out,
+            'r2_high': r2_high,
+            'r2_low': r2_low,
             'slopes': (slope_high, slope_low),
             'trendlines': {
                 'upper': (slope_high * x_axis + intercept_high),
