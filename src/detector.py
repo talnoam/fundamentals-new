@@ -48,19 +48,18 @@ class PatternDetector:
         is_closing = slope_high < slope_low
 
         # b. Calculating the distance between the lines at the end of the period.
+        first_extrema_idx = int(min(high_idx[0], low_idx[0]))
         last_idx = len(prices) - 1
-        dist_start = (model_high.predict([[0]]) - model_low.predict([[0]]))[0]
+        prev_idx = last_idx - 1
+        dist_start = (model_high.predict([[first_extrema_idx]]) - model_low.predict([[first_extrema_idx]]))[0]
         dist_end = (model_high.predict([[last_idx]]) - model_low.predict([[last_idx]]))[0]
         
         # Has the distance decreased significantly?
-        compression = float(dist_end / dist_start) if dist_start != 0 else 1.0
+        compression = float(dist_end / dist_start) if dist_start > 0 else 1.0
 
         is_converging = is_closing and compression < 0.7 # Example: a reduction of at least 30%.
 
-        # 4. Breakout detection.
-        last_idx = len(prices) - 1
-        prev_idx = last_idx - 1
-        
+        # 4. Breakout detection.        
         if len(prices) < 2:
             return {'is_converging': False}
 
@@ -97,6 +96,5 @@ class PatternDetector:
                 'upper': (slope_high * x_axis + intercept_high),
                 'lower': (slope_low * x_axis + intercept_low)
             },
-            'compression': compression,
-            'score': (1 - compression) * (1 if is_breaking_out else 0.5)
+            'compression': compression
         }

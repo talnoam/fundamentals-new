@@ -8,9 +8,10 @@ logger = logging.getLogger(__name__)
 class ScoringEngine:
     def __init__(self, config: dict):
         self.weights = config.get('weights', {
-            'quality': 0.4,
-            'compression': 0.4,
-            'volume': 0.2
+            'quality': 0.3,
+            'compression': 0.3,
+            'volume': 0.2,
+            'breakout_strength': 0.2
         })
 
     def calculate_score(self, df: pd.DataFrame, pattern: dict) -> float:
@@ -39,11 +40,16 @@ class ScoringEngine:
             # A reliable breakout must come with volume higher than average
             volume_score = self._calculate_volume_score(df)
 
+            # 4. Breakout Strength (Normalization: a breakout of 3% or more gets a score of 1.0)
+            raw_strength = pattern.get('breakout_strength', 0)
+            strength_score = max(0, min(1, raw_strength / 0.03)) if pattern['is_breaking_out'] else 0
+
             # Final calculation
             final_score = (
                 quality_score * self.weights['quality'] +
                 compression_score * self.weights['compression'] +
-                volume_score * self.weights['volume']
+                volume_score * self.weights['volume'] +
+                strength_score * self.weights['breakout_strength']
             ) * 100
 
             return round(final_score, 2)
