@@ -1,6 +1,7 @@
 import re
 import sys
 import json
+import yaml
 import pandas as pd
 from pathlib import Path
 
@@ -13,8 +14,14 @@ from src.llm_analyzer import LLMAnalyzer
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 BASE_DIR = Path(__file__).parent.parent
-CHARTS_DIR = BASE_DIR / "reports" / "charts"
-AI_REPORTS_DIR = BASE_DIR / "reports" / "ai_analysis"
+CONFIG_PATH = BASE_DIR / "config" / "settings.yaml"
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f) or {}
+
+charts_output_dir = config.get("visualization", {}).get("charts_output_dir", "reports/charts")
+ai_reports_output_dir = config.get("visualization", {}).get("ai_reports_output_dir", "reports/ai_analysis")
+CHARTS_DIR = BASE_DIR / charts_output_dir
+AI_REPORTS_DIR = BASE_DIR / ai_reports_output_dir
 AI_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 CHART_FILENAME_PATTERN = re.compile(
     r"^(?P<ticker>.+)_(?P<date>\d{4}-\d{2}-\d{2})_score_(?P<score>\d+)$"

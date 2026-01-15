@@ -22,7 +22,8 @@ data:
   default_interval: "1d"
 
 visualization:
-  output_dir: "reports/charts"
+  charts_output_dir: "reports/charts"
+  ai_reports_output_dir: "reports/ai_analysis"
   top_n: 5 # How many charts to generate at the end of the run
   show_plot: False
 

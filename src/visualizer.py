@@ -8,12 +8,12 @@ logger = logging.getLogger(__name__)
 
 class Visualizer:
     def __init__(self, config: dict):
-        self.output_dir = config.get('output_dir', 'reports/charts')
+        self.charts_output_dir = config.get('charts_output_dir', 'reports/charts')
         self.sma_period = config.get('sma_period', 150)
         self.show_plot = config.get('show_plot', False)
         # Create the output directory if it doesn't exist
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        if not os.path.exists(self.charts_output_dir):
+            os.makedirs(self.charts_output_dir)
 
     def create_chart(self, ticker: str, df: pd.DataFrame, pattern: dict, score: float):
         """
@@ -108,7 +108,7 @@ class Visualizer:
 
         # 6. Saving to an HTML file
         filename = f"{ticker}_{today_str}_score_{int(score)}.html"
-        file_path = os.path.join(self.output_dir, filename)
+        file_path = os.path.join(self.charts_output_dir, filename)
         fig.write_html(file_path)
         
         logger.info(f"Chart saved successfully to: {file_path}")
