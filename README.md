@@ -8,6 +8,7 @@ A comprehensive multi-page Streamlit application for investment analysis, featur
   - Landing page with dashboard overview
   - Fundamentals Dashboard for comprehensive company analysis
   - Technical Analysis Dashboard for price chart analysis
+  - Report Charts Dashboard for viewing saved report charts
   - Market Analysis Dashboard for market indicators and economic data
 - **Interactive Dashboards**: User-friendly interfaces for analyzing any stock ticker
 - **Comprehensive Stock Selection**:
@@ -29,6 +30,10 @@ A comprehensive multi-page Streamlit application for investment analysis, featur
   - SMA indicators (20, 50, 150, 200 periods)
   - Automatic support and resistance level detection
   - Support/resistance calculated from recent 6 months of data
+- **Report Charts**:
+  - Browse saved report charts from `reports/charts`
+  - Interactive zoom, pan, and hover analysis
+  - Filter by ticker and report date
 - **Market Analysis**:
   - 12+ market indicators (Bitcoin, S&P 500, NASDAQ, Dow Jones, VIX, etc.)
   - Compare multiple indicators on the same chart
@@ -76,6 +81,7 @@ The application uses Streamlit's built-in multi-page navigation:
 - **Landing Page** (`app.py`): Welcome page with dashboard overview
 - **Fundamentals Dashboard** (`pages/Fundamentals.py`): Comprehensive fundamental analysis
 - **Technical Analysis Dashboard** (`pages/Technical_Analysis.py`): Price chart analysis with technical indicators
+- **Report Charts Dashboard** (`pages/Report_Charts.py`): View and analyze saved report charts
 - **Market Analysis Dashboard** (`pages/Market_Analysis.py`): Market indicators and economic data analysis
 
 Navigate between pages using the sidebar menu that appears automatically in multi-page Streamlit apps.
@@ -122,6 +128,17 @@ The landing page provides an overview of available dashboards and getting starte
    - Analyze price movements and trading volume patterns
    - Overlay SMA lines and support/resistance levels
    - Charts update automatically based on your selected parameters
+
+#### Report Charts Dashboard
+1. **Navigate**: Select "Report_Charts" from the sidebar menu
+2. **Select a Ticker**:
+   - Choose from the dropdown list of available report charts
+   - Or enter a custom ticker to filter existing reports
+3. **Pick a Report**:
+   - Select the report date and score from the list
+4. **Analyze**:
+   - Use interactive zoom, pan, and hover to inspect the chart
+   - Review report scores alongside the chart
 
 #### Market Analysis Dashboard
 1. **Navigate**: Select "Market_Analysis" from the sidebar menu
@@ -175,6 +192,7 @@ python report.py
 - `app.py`: Main entry point and landing page for the multi-page application
 - `pages/Fundamentals.py`: Streamlit page for fundamental analysis with chart functionality
 - `pages/Technical_Analysis.py`: Streamlit page for technical analysis with SMA and support/resistance indicators
+- `pages/Report_Charts.py`: Streamlit page for viewing saved report charts
 - `pages/Market_Analysis.py`: Streamlit page for market indicators and economic data analysis
 - `report.py`: Core analysis logic, candlestick chart creation, and multi-indicator chart functions
 - `report_utils.py`: Financial calculations, data fetching, and ticker management
