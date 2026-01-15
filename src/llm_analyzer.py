@@ -1,18 +1,21 @@
 import os
 import re
+import logging
+
 from dotenv import load_dotenv
 from openai import OpenAI
-import logging
+from typing import Dict
 
 load_dotenv()
 logger = logging.getLogger(__name__)
+
 
 class LLMAnalyzer:
     def __init__(self):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4o" # Faster execution with gpt-4o
 
-    def get_equity_report(self, ticker: str) -> str:
+    def get_equity_report(self, ticker: str) -> Dict[str, str]:
         """
         Creates a full analysis report based on the professional prompt you defined.
         """
