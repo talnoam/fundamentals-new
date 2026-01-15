@@ -1,5 +1,6 @@
 import re
 import sys
+import json
 import pandas as pd
 from pathlib import Path
 
@@ -11,12 +12,13 @@ from src.llm_analyzer import LLMAnalyzer
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-CHARTS_DIR = Path(__file__).parent.parent / "reports" / "charts"
+BASE_DIR = Path(__file__).parent.parent
+CHARTS_DIR = BASE_DIR / "reports" / "charts"
+AI_REPORTS_DIR = BASE_DIR / "reports" / "ai_analysis"
+AI_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 CHART_FILENAME_PATTERN = re.compile(
     r"^(?P<ticker>.+)_(?P<date>\d{4}-\d{2}-\d{2})_score_(?P<score>\d+)$"
 )
-
-analyzer = LLMAnalyzer()
 
 @st.cache_data(ttl=300)
 def list_report_charts():
@@ -100,34 +102,38 @@ selected_ticker = st.sidebar.selectbox(
 ticker_filter = custom_ticker if custom_ticker else selected_ticker
 
 filtered_charts = [chart for chart in charts if chart["ticker"] == ticker_filter]
-
 if not filtered_charts:
     st.info(
         f"No report charts found for `{ticker_filter}`. "
         "Select another ticker from the sidebar."
     )
     st.stop()
-
 chart_options = {chart["label"]: chart for chart in filtered_charts}
-
 selected_label = st.sidebar.selectbox(
     "Select Report Chart",
     list(chart_options.keys()),
     index=0,
     help="Choose a report date and score",
 )
-
 selected_chart = chart_options[selected_label]
+
+st.header(f"📈 {selected_chart['ticker']} Report Chart")
+
+# Save and load analysis from disk
+analysis_filename = f"{selected_chart['ticker']}_{selected_chart['date']}_analysis.json"
+analysis_path = AI_REPORTS_DIR / analysis_filename
+analysis_key = f"data_{selected_chart['ticker']}_{selected_chart['date']}"
+
+# Check if analysis exists on disk and load it into Session State
+if analysis_path.exists() and analysis_key not in st.session_state:
+    with open(analysis_path, "r", encoding="utf-8") as f:
+        st.session_state[analysis_key] = json.load(f)
 
 col1, col2 = st.columns([3, 1])
 
 with col1:
-    st.header(f"📈 {selected_chart['ticker']} Report Chart")
     st.caption(f"Date: {selected_chart['date']} | Score: {selected_chart['score']}")
     st.info("Use zoom, pan, and hover to analyze the chart interactively.")
-
-# Manage analysis state in Session State
-analysis_key = f"analysis_{selected_chart['ticker']}"
 
 if analysis_key in st.session_state:
     sentiment = st.session_state[analysis_key]['sentiment']
@@ -146,17 +152,23 @@ with st.spinner("Loading report chart..."):
 st.divider()
 st.subheader(f"🔍 AI Equity Research: {selected_chart['ticker']}")
 
-if st.button(f"Generate AI Analysis for {selected_chart['ticker']}", type="primary"):
+btn_label = f"Generate AI Analysis for {selected_chart['ticker']}" if analysis_key not in st.session_state else "Re-generate Analysis (Refresh)"
+
+if st.button(btn_label, type="primary"):
     with st.spinner(f"Analyzing {selected_chart['ticker']} fundamentals and macro..."):
+        analyzer = LLMAnalyzer()
         analysis_data = analyzer.get_equity_report(selected_chart['ticker'])
+
+        with open(analysis_path, "w", encoding="utf-8") as f:
+            json.dump(analysis_data, f, ensure_ascii=False, indent=4)
+
         st.session_state[analysis_key] = analysis_data
+        st.toast(f"Report saved to reports/ai_analysis/{analysis_filename}", icon="💾")
         st.rerun()
 
 # Display the analysis if it exists
 if analysis_key in st.session_state:
     st.markdown(st.session_state[analysis_key]['report'])
-    
-    # Download button as text file
     st.download_button(
         label="Download Analysis Report",
         data=st.session_state[analysis_key]['report'],
