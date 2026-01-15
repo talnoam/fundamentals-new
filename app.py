@@ -33,6 +33,12 @@ Price chart analysis and technical indicators:
 - Automatic support and resistance levels
 - Historical price data visualization (1-10 years)
 
+### 📊 Report Charts Dashboard
+Analyze previously generated report charts:
+- Browse saved report charts from reports/charts
+- Filter by ticker and report date
+- Interactive zoom, pan, and hover analysis
+
 ### 🌍 Market Analysis Dashboard
 Comprehensive market indicators and economic data analysis:
 - Multiple market indicators (Bitcoin, S&P 500, NASDAQ, Dow Jones, etc.)
@@ -55,7 +61,7 @@ Always do your own research and consult with a financial advisor.
 """)
 
 # Add some visual elements
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 
 with col1:
     st.metric("Fundamentals", "Analysis", "📊")
@@ -68,4 +74,7 @@ with col3:
 
 with col4:
     st.metric("Real-time", "Data", "🔄")
+
+with col5:
+    st.metric("Report", "Charts", "📊")
 
