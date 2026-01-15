@@ -1,4 +1,5 @@
 import os
+import re
 from dotenv import load_dotenv
 from openai import OpenAI
 import logging
@@ -51,6 +52,9 @@ class LLMAnalyzer:
         Use bullet points where appropriate
         Be concise, professional, and insight-driven
         Do not explain your process just deliver the analysis
+
+        IMPORTANT: At the very end of your response, add a single line in this format:
+        FINAL_SENTIMENT: [BULLISH/BEARISH/NEUTRAL]
         """
         
         try:
@@ -62,7 +66,19 @@ class LLMAnalyzer:
                 ],
                 temperature=0
             )
-            return response.choices[0].message.content
+            full_content = response.choices[0].message.content
+            
+            # Extract the sentiment using Regex
+            sentiment_match = re.search(r"FINAL_SENTIMENT:\s*(BULLISH|BEARISH|NEUTRAL)", full_content, re.IGNORECASE)
+            sentiment = sentiment_match.group(1).upper() if sentiment_match else "NEUTRAL"
+            
+            # Clean the sentiment tag from the displayed report to the user
+            clean_report = re.sub(r"FINAL_SENTIMENT:.*", "", full_content).strip()
+            
+            return {
+                "report": clean_report,
+                "sentiment": sentiment
+            }
         except Exception as e:
             logger.error(f"LLM Analysis failed for {ticker}: {e}")
-            return f"Error generating report for {ticker}. Please check API logs."
+            return {"report": f"Error: {e}", "sentiment": "ERROR"}
