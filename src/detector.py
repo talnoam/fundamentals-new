@@ -10,8 +10,13 @@ class PatternDetector:
     def __init__(self, config: dict):
         self.order = config.get('extrema_order', 5)  # How many days on each side of each point for it to be considered a peak.
         self.min_points = config.get('min_points', 3) # Minimum points for a trend line.
-        self.convergence_threshold = config.get('convergence_threshold', 0.1) # Maximum distance at the end.
-        self.windows = [60, 90, 120, 160, 252]
+        self.convergence_threshold = config.get('convergence_threshold', 0.1) # Max distance ratio at the end.
+        self.windows = config.get('windows', [60, 90, 120, 160, 252])
+        self.weight_start = config.get('trend_weight_start', 1.0)
+        self.weight_end = config.get('trend_weight_end', 5.0)
+        self.breakout_min_days = config.get('breakout_min_days', 1)
+        self.breakout_max_days = config.get('breakout_max_days', 2)
+        self.breakdown_confirm_days = config.get('breakdown_confirm_days', 2)
 
     def analyze_convergence(self, df: pd.DataFrame) -> dict:
         """
@@ -60,7 +65,7 @@ class PatternDetector:
         # 2. Fitting trend lines (linear regression).
 
         # Resistance line (highs)
-        weights = np.linspace(1, 5, len(high_idx)) # The last peak is 5 times more important than the first one
+        weights = np.linspace(self.weight_start, self.weight_end, len(high_idx))
         model_high = LinearRegression().fit(high_idx.reshape(-1, 1), df['High'].values[high_idx], sample_weight=weights)
         r2_high = model_high.score(high_idx.reshape(-1, 1), df['High'].values[high_idx])
 
@@ -81,7 +86,7 @@ class PatternDetector:
         dist_end = upper_trendline.iloc[-1] - lower_trendline.iloc[-1]
         compression = float(dist_end / dist_start) if dist_start > 0 else 1.0
 
-        is_converging = (slope_high < slope_low) and (compression < 0.7) # Example: a reduction of at least 30%.
+        is_converging = (slope_high < slope_low) and (compression < self.convergence_threshold)
 
         # 4. Breakout detection (vectorized)
         # Comparing all prices to the trend line in one go
@@ -94,10 +99,14 @@ class PatternDetector:
                 break
         
         # Definition: a relevant breakout is only one that has exactly 1 or 2 days above the line
-        is_breaking_out = 1 <= consecutive_above <= 2
+        is_breaking_out = self.breakout_min_days <= consecutive_above <= self.breakout_max_days
 
         # Detection of a breakdown
-        is_breaking_down = (prices[-1] < lower_trendline.iloc[-1]) and (prices[-2] < lower_trendline.iloc[-2])
+        confirm_days = min(len(prices), max(1, self.breakdown_confirm_days))
+        is_breaking_down = all(
+            prices[-offset] < lower_trendline.iloc[-offset]
+            for offset in range(1, confirm_days + 1)
+        )
 
         return {
             'is_converging': is_converging,

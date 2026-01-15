@@ -196,6 +196,7 @@ python report.py
 - `pages/Market_Analysis.py`: Streamlit page for market indicators and economic data analysis
 - `report.py`: Core analysis logic, candlestick chart creation, and multi-indicator chart functions
 - `report_utils.py`: Financial calculations, data fetching, and ticker management
+- `config/settings.yaml`: Centralized thresholds and scoring parameters for the scanner
 
 ## Investment Methodology
 

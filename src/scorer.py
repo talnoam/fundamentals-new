@@ -14,6 +14,23 @@ class ScoringEngine:
             'breakout_strength': 0.1,
             'freshness': 0.1
         })
+        self.r2_quality_min = config.get('r2_quality_min', 0.5)
+        self.breakout_strength_max = config.get('breakout_strength_max', 0.03)
+        self.volume_window = config.get('volume_window', 20)
+        self.volume_ratio_full_score = config.get('volume_ratio_full_score', 2.0)
+        self.breakout_age_scores = self._normalize_age_scores(
+            config.get('breakout_age_scores', {1: 1.0, 2: 0.7})
+        )
+        self.breakout_age_default_score = config.get('breakout_age_default_score', 0.0)
+
+    def _normalize_age_scores(self, scores) -> dict:
+        normalized = {}
+        for key, value in (scores or {}).items():
+            try:
+                normalized[int(key)] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return normalized
 
     def calculate_score(self, df: pd.DataFrame, pattern: dict) -> float:
         """
@@ -41,14 +58,15 @@ class ScoringEngine:
             # A reliable breakout must come with volume higher than average
             volume_score = self._calculate_volume_score(df)
 
-            # 4. Breakout Strength (Normalization: a breakout of 3% or more gets a score of 1.0)
+            # 4. Breakout Strength (Normalization: breakout_strength_max gets a score of 1.0)
             raw_strength = pattern.get('breakout_strength', 0)
-            strength_score = max(0, min(1, raw_strength / 0.03)) if pattern['is_breaking_out'] else 0
+            strength_score = 0.0
+            if pattern['is_breaking_out'] and self.breakout_strength_max > 0:
+                strength_score = max(0, min(1, raw_strength / self.breakout_strength_max))
 
             # 5. Freshness Score (Bonus for the first day)
             age = pattern.get('breakout_age', 0)
-            # The first day gets 1.0, the second day gets 0.7, the rest get 0
-            freshness_score = 1.0 if age == 1 else 0.7 if age == 2 else 0.0
+            freshness_score = self.breakout_age_scores.get(age, self.breakout_age_default_score)
 
             # Final calculation
             final_score = (
@@ -71,7 +89,7 @@ class ScoringEngine:
         """
         # If the Detector didn't return R², we'll use a default value
         r2_high = pattern.get('r2_high', 0)
-        if r2_high < 0.5:
+        if r2_high < self.r2_quality_min:
             return 0.0
         r2_low = pattern.get('r2_low', 0)
         
@@ -86,10 +104,12 @@ class ScoringEngine:
         Checks whether the current volume is higher than the average of the last 20 days.
         """
         recent_volume = df['Volume'].values[-1]
-        avg_volume = df['Volume'].rolling(window=20).mean().values[-1]
+        avg_volume = df['Volume'].rolling(window=self.volume_window).mean().values[-1]
         
         if avg_volume == 0: return 0
         
         rel_vol = recent_volume / avg_volume
-        # Normalization: if the volume is double the average, the score is 1. If it's half - 0.25.
-        return float(max(0, min(1, (rel_vol / 2))))
+        # Normalization: if the volume is volume_ratio_full_score * avg, the score is 1
+        if self.volume_ratio_full_score <= 0:
+            return 0.0
+        return float(max(0, min(1, (rel_vol / self.volume_ratio_full_score))))
