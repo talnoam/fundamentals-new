@@ -44,8 +44,9 @@ scoring:
   breakout_age_default_score: 0.0
 
 llm_analysis:
-  model: "gpt-4o"
-  temperature: 0
+  model: "gpt-5" # gpt-4o is faster but gpt-5 is more accurate
+  temperature: 0 # 0 for deterministic output, 1 for more creative output
+  reasoning_effort: "medium" # Will only work with GPT-5 and above (low, medium, high)
   system_role: "You are a senior equity research analyst."
   prompt_template: |
     Act as an elite equity research analyst at a top-tier investment firm or hedge fund. 
