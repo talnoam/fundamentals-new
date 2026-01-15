@@ -163,7 +163,8 @@ btn_label = f"Generate AI Analysis for {selected_chart['ticker']}" if analysis_k
 
 if st.button(btn_label, type="primary"):
     with st.spinner(f"Analyzing {selected_chart['ticker']} fundamentals and macro..."):
-        analyzer = LLMAnalyzer()
+        llm_config = config.get("llm_analysis", {})
+        analyzer = LLMAnalyzer(llm_config)
         analysis_data = analyzer.get_equity_report(selected_chart['ticker'])
 
         with open(analysis_path, "w", encoding="utf-8") as f:
