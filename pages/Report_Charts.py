@@ -5,6 +5,8 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
+from src.llm_analyzer import LLMAnalyzer
+
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -12,6 +14,8 @@ CHARTS_DIR = Path(__file__).parent.parent / "reports" / "charts"
 CHART_FILENAME_PATTERN = re.compile(
     r"^(?P<ticker>.+)_(?P<date>\d{4}-\d{2}-\d{2})_score_(?P<score>\d+)$"
 )
+
+analyzer = LLMAnalyzer()
 
 
 @st.cache_data(ttl=300)
@@ -115,6 +119,30 @@ st.info("Use zoom, pan, and hover to analyze the chart interactively.")
 with st.spinner("Loading report chart..."):
     chart_html = load_chart_html(selected_chart["path"])
     components.html(chart_html, height=800, scrolling=True)
+
+
+st.divider()
+st.subheader(f"🔍 AI Equity Research: {selected_chart['ticker']}")
+
+# Manage analysis state in Session State
+analysis_key = f"analysis_{selected_chart['ticker']}"
+
+if st.button(f"Generate AI Analysis for {selected_chart['ticker']}", type="primary"):
+    with st.spinner(f"Analyzing {selected_chart['ticker']} fundamentals and macro..."):
+        report = analyzer.get_equity_report(selected_chart['ticker'])
+        st.session_state[analysis_key] = report
+
+# Display the analysis if it exists
+if analysis_key in st.session_state:
+    st.markdown(st.session_state[analysis_key])
+    
+    # Download button as text file
+    st.download_button(
+        label="Download Analysis Report",
+        data=st.session_state[analysis_key],
+        file_name=f"{selected_chart['ticker']}_analysis_{selected_chart['date']}.md",
+        mime="text/markdown"
+    )
 
 # Footer
 st.divider()
