@@ -68,16 +68,20 @@ class ScoringEngine:
             age = pattern.get('breakout_age', 0)
             freshness_score = self.breakout_age_scores.get(age, self.breakout_age_default_score)
 
+            # 6. Momentum/Volatility Bonus
+            vol_score = self._calculate_volatility_score(df)
+
             # Final calculation
             final_score = (
-                quality_score * self.weights['quality'] +
-                compression_score * self.weights['compression'] +
-                volume_score * self.weights['volume'] +
-                strength_score * self.weights['breakout_strength'] +
-                freshness_score * self.weights['freshness']
-            ) * 100
+                quality_score * self.weights.get('quality', 0.2) +
+                compression_score * self.weights.get('compression', 0.3) +
+                volume_score * self.weights.get('volume', 0.3) +
+                strength_score * self.weights.get('breakout_strength', 0.1) +
+                freshness_score * self.weights.get('freshness', 0.1)
+            )
+            final_score = (final_score * 100) + (vol_score * 10)
 
-            return round(final_score, 2)
+            return round(min(100, final_score), 2)
 
         except Exception as e:
             logger.error(f"Error in scoring: {e}")
@@ -113,3 +117,19 @@ class ScoringEngine:
         if self.volume_ratio_full_score <= 0:
             return 0.0
         return float(max(0, min(1, (rel_vol / self.volume_ratio_full_score))))
+
+    def _calculate_volatility_score(self, df: pd.DataFrame) -> float:
+        """
+        Calculates annualized volatility to identify high-momentum stocks.
+        """
+        # Calculate daily returns standard deviation
+        daily_returns = df['Close'].pct_change().dropna()
+        if daily_returns.empty:
+            return 0.0
+            
+        # Annual volatility formula:
+        # $\sigma_{annual} = \sigma_{daily} \cdot \sqrt{252}$
+        annual_vol = daily_returns.std() * (252 ** 0.5)
+        
+        # Normalization: volatility of 50% or higher gets a score of 1.0 (maximum score)
+        return float(max(0, min(1, annual_vol / 0.50)))
