@@ -28,23 +28,50 @@ class PatternDetector:
             'is_breaking_out': False,
             'r2_high': -1.0,
             'breakout_age': 0,
-            'trendlines': {'upper': None, 'lower': None}
+            'trendlines': {'upper': None, 'lower': None},
+            'selection_score': -1.0
         }
         
-        for window in self.windows:
+        valid_results = []
+        
+        # Scan from the shortest window to the longest to give priority to the most recent structure
+        for window in sorted(self.windows):
             if len(df) < window:
                 continue
                 
-            # Cutting the data to the specific window
             df_slice = df.tail(window).copy()
+            
+            # Dynamic adjustment of the Order for short windows
+            # In short windows (60-90 days), it is difficult to find 3 points with order=5. 
+            # Reducing the order allows us to detect the local peaks.
+            original_order = self.order
+            if window <= 100:
+                self.order = max(3, original_order - 2)
+            
             result = self._find_pattern_in_window(df_slice)
             
-            # We select the window with the highest R2 (highest confidence)
-            # and only if convergence and breakout were found
+            # Returning the order to its original state for the next iteration
+            self.order = original_order
+            
             if result['is_converging'] and result['is_breaking_out']:
-                if result['r2_high'] > best_result['r2_high']:
-                    best_result = result
-                    best_result['used_window'] = window
+                # Early Exit logic (Early Exit)
+                # If we found a perfect local structure (R2 > 0.85), this is probably the strongest signal.
+                if window <= 90 and result['r2_high'] >= 0.85:
+                    result['used_window'] = window
+                    logger.info(f"High-quality local pattern found (Window {window}, R2 {result['r2_high']:.2f}).")
+                    return result
+
+                # Calculation of the Selection Score (Selection Score)
+                # Short windows get a "bonus" to beat long and less accurate lines.
+                window_weight = 1.2 if window <= 90 else (1.1 if window <= 120 else 1.0)
+                result['selection_score'] = result['r2_high'] * window_weight
+                result['used_window'] = window
+                
+                valid_results.append(result)
+
+        if valid_results:
+            best_result = max(valid_results, key=lambda x: x['selection_score'])
+            logger.info(f"Selected best window: {best_result['used_window']} (Score: {best_result['selection_score']:.2f})")
         
         return best_result
 
