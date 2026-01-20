@@ -53,7 +53,7 @@ def analyze_single_ticker(ticker: str, data_engine, detector, scorer):
                     'pattern': pattern_result,
                     'score': score
                 }
-    except Exception as e:
+    except Exception:
         # In Multiprocessing, it is important to catch errors so that the Pool does not crash
         return None
     return None
@@ -62,7 +62,8 @@ class StockScanner:
     def __init__(self, config_path: str = "config/settings.yaml"):
         self.config = self._load_config(config_path)
         self.data_engine = DataEngine(self.config.get('data', {}))
-        self.filter_engine = FilterEngine(self.config.get('filters', {}))
+        # Pass data_engine to FilterEngine so it can use cached data
+        self.filter_engine = FilterEngine(self.config.get('filters', {}), data_engine=self.data_engine)
         self.detector = PatternDetector(self.config.get('patterns', {}))
         self.scorer = ScoringEngine(self.config.get('scoring', {}))
         self.visualizer = Visualizer(self.config.get('visualization', {}))
