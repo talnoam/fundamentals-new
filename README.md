@@ -187,6 +187,42 @@ You can also run the original command-line version:
 python report.py
 ```
 
+### Stock Scanner
+
+The stock scanner (`stock_scanner/scanner.py`) is a pattern detection system that scans multiple tickers for breakout patterns and generates analysis reports.
+
+#### Running the Full Scanner
+
+To scan all tickers (S&P 500, Dow, Nasdaq):
+
+```bash
+python stock_scanner/scanner.py
+```
+
+#### Testing a Single Ticker
+
+To test pattern detection and scoring for a single ticker and generate its chart:
+
+```bash
+python stock_scanner/test_single_ticker.py TICKER
+```
+
+For example:
+```bash
+python stock_scanner/test_single_ticker.py AAPL
+```
+
+This script:
+- Analyzes the specified ticker using `analyze_single_ticker`
+- Displays pattern detection results (compression, R², breakout status, score)
+- Generates an interactive chart using `create_chart` saved to `reports/charts/`
+- Useful for examining changes in pattern detector and scoring algorithms
+
+You can also specify a custom config file:
+```bash
+python stock_scanner/test_single_ticker.py AAPL --config config/settings.yaml
+```
+
 ## Key Components
 
 - `app.py`: Main entry point and landing page for the multi-page application
@@ -196,6 +232,8 @@ python report.py
 - `pages/Market_Analysis.py`: Streamlit page for market indicators and economic data analysis
 - `report.py`: Core analysis logic, candlestick chart creation, and multi-indicator chart functions
 - `report_utils.py`: Financial calculations, data fetching, and ticker management
+- `stock_scanner/scanner.py`: Main stock scanner that analyzes multiple tickers for breakout patterns
+- `stock_scanner/test_single_ticker.py`: Script to test pattern detection and scoring for a single ticker
 - `config/settings.yaml`: Centralized thresholds and scoring parameters for the scanner
 
 ## Investment Methodology

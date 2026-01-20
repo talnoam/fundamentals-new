@@ -11,6 +11,21 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+        },
+        {
+            "name": "Python: Streamlit App",
+            "type": "python",
+            "request": "launch",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "app.py"
+            ],
+            "justMyCode": true,
+            "python": "${workspaceFolder}/venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         }
     ]
 }
