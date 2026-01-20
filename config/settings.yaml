@@ -29,9 +29,9 @@ visualization:
 
 scoring:
   weights:
-    quality: 0.3
+    quality: 0.2
     compression: 0.3
-    volume: 0.2
+    volume: 0.3
     breakout_strength: 0.1
     freshness: 0.1
   r2_quality_min: 0.5
