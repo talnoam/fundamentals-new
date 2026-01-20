@@ -77,27 +77,55 @@ st.title("📊 Report Charts Dashboard")
 st.markdown("**Analyze previously generated report charts**")
 
 charts = list_report_charts()
-if charts:
-    with st.expander("🏆 Latest Scan: Top Picks Summary", expanded=True):
-        df_charts = pd.DataFrame(charts)
-        # Convert to number for sorting
-        df_charts['score'] = pd.to_numeric(df_charts['score'], errors='coerce')
-        # Display the sorted table by highest score
-        summary_df = df_charts[['ticker', 'date', 'score']].sort_values(by='score', ascending=False)
-        st.dataframe(summary_df, use_container_width=True, hide_index=True)
-else:
+if not charts:
     st.warning("No report charts found in `reports/charts`.")
     st.stop()
 
 # Sidebar for inputs
 st.sidebar.header("Chart Parameters")
 
+# Date selection
+available_dates = sorted({chart["date"] for chart in charts}, reverse=True)
+selected_date = st.sidebar.selectbox(
+    "Select Date",
+    ["All dates"] + available_dates,
+    index=0,
+    help="Filter charts by report date",
+)
+
+# Filter charts by date
+if selected_date == "All dates":
+    date_filtered_charts = charts
+else:
+    date_filtered_charts = [chart for chart in charts if chart["date"] == selected_date]
+
+if not date_filtered_charts:
+    st.info(f"No report charts found for date `{selected_date}`.")
+    st.stop()
+
+# Sort by score (highest first) within the date selection
+date_filtered_charts.sort(
+    key=lambda item: (
+        pd.to_numeric(item["score"], errors='coerce') if item["score"] != "N/A" else -1
+    ),
+    reverse=True
+)
+
+# Top Picks Summary - filtered by selected date
+with st.expander("🏆 Latest Scan: Top Picks Summary", expanded=True):
+    df_charts = pd.DataFrame(date_filtered_charts)
+    # Convert to number for sorting
+    df_charts['score'] = pd.to_numeric(df_charts['score'], errors='coerce')
+    # Display the sorted table by highest score
+    summary_df = df_charts[['ticker', 'date', 'score']].sort_values(by='score', ascending=False)
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
+
 custom_ticker = st.sidebar.text_input(
     "Or enter custom ticker",
     help="Filter to a ticker that exists in reports/charts",
 ).upper()
 
-available_tickers = sorted({chart["ticker"] for chart in charts})
+available_tickers = sorted({chart["ticker"] for chart in date_filtered_charts})
 
 selected_ticker = st.sidebar.selectbox(
     "Select Ticker",
@@ -108,19 +136,21 @@ selected_ticker = st.sidebar.selectbox(
 
 ticker_filter = custom_ticker if custom_ticker else selected_ticker
 
-filtered_charts = [chart for chart in charts if chart["ticker"] == ticker_filter]
+filtered_charts = [chart for chart in date_filtered_charts if chart["ticker"] == ticker_filter]
 if not filtered_charts:
     st.info(
         f"No report charts found for `{ticker_filter}`. "
         "Select another ticker from the sidebar."
     )
     st.stop()
+
+# Charts are already sorted by score (highest first) from date_filtered_charts
 chart_options = {chart["label"]: chart for chart in filtered_charts}
 selected_label = st.sidebar.selectbox(
     "Select Report Chart",
     list(chart_options.keys()),
     index=0,
-    help="Choose a report date and score",
+    help="Choose a report chart (sorted by highest score first)",
 )
 selected_chart = chart_options[selected_label]
 

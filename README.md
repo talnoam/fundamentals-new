@@ -131,12 +131,15 @@ The landing page provides an overview of available dashboards and getting starte
 
 #### Report Charts Dashboard
 1. **Navigate**: Select "Report_Charts" from the sidebar menu
-2. **Select a Ticker**:
-   - Choose from the dropdown list of available report charts
+2. **Select a Date**:
+   - Choose a specific report date from the dropdown
+   - Or select "All dates" to see reports from all dates
+3. **Select a Ticker**:
+   - Choose from the dropdown list of available report charts (filtered by selected date)
    - Or enter a custom ticker to filter existing reports
-3. **Pick a Report**:
-   - Select the report date and score from the list
-4. **Analyze**:
+4. **Pick a Report**:
+   - Select the report chart from the list (sorted by highest score first)
+5. **Analyze**:
    - Use interactive zoom, pan, and hover to inspect the chart
    - Review report scores alongside the chart
 
