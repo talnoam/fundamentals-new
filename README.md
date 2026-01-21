@@ -34,6 +34,7 @@ A comprehensive multi-page Streamlit application for investment analysis, featur
   - Browse saved report charts from `reports/charts`
   - Interactive zoom, pan, and hover analysis
   - Filter by ticker and report date
+  - Volume bars displayed below price charts (green for up days, red for down days)
 - **Market Analysis**:
   - 12+ market indicators (Bitcoin, S&P 500, NASDAQ, Dow Jones, VIX, etc.)
   - Compare multiple indicators on the same chart
@@ -142,6 +143,7 @@ The landing page provides an overview of available dashboards and getting starte
 5. **Analyze**:
    - Use interactive zoom, pan, and hover to inspect the chart
    - Review report scores alongside the chart
+   - View volume bars below the price chart to analyze trading volume patterns
 
 #### Market Analysis Dashboard
 1. **Navigate**: Select "Market_Analysis" from the sidebar menu
@@ -218,7 +220,7 @@ python stock_scanner/test_single_ticker.py AAPL
 This script:
 - Analyzes the specified ticker using `analyze_single_ticker`
 - Displays pattern detection results (compression, R², breakout status, score)
-- Generates an interactive chart using `create_chart` saved to `reports/charts/`
+- Generates an interactive chart with price and volume using `create_chart` saved to `reports/charts/`
 - Useful for examining changes in pattern detector and scoring algorithms
 
 You can also specify a custom config file:
