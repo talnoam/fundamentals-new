@@ -52,41 +52,43 @@ class FilterEngine:
         """
         logger.info(f"Applying coarse filters to {len(tickers)} tickers...")
         passed_tickers = []
+        total = len(tickers)
 
         if self.use_cache:
             # Use cached data approach - process tickers individually using cache
             logger.info("Using cached data when available to minimize API calls...")
-            for ticker in tickers:
+            for i, ticker in enumerate(tickers, 1):
+                # report progress to the log (every 100 tickers or at the end)
+                if i % 100 == 0 or i == total:
+                    logger.info(f"FILTER_PROGRESS: {i}/{total}")
+
                 try:
-                    # Try to get data from cache first (DataEngine handles cache logic)
                     df = self.data_engine.fetch_historical_data(ticker, force_refresh=False)
-                    
                     if self._process_ticker(ticker, df):
                         passed_tickers.append(ticker)
-
                 except Exception as e:
                     logger.debug(f"Error processing {ticker}: {e}")
                     continue
         else:
             # Fallback to batch download approach (original behavior)
             logger.info("Using batch download (no cache available)...")
-            # split into batches to avoid overloading the API
-            for i in range(0, len(tickers), self.batch_size):
+            for i in range(0, total, self.batch_size):
                 batch = tickers[i : i + self.batch_size]
+                current_processed = min(i + self.batch_size, total)
+                
+                # report progress after each batch download
+                logger.info(f"FILTER_PROGRESS: {current_processed}/{total}")
+
                 try:
                     # 1. fetch historical price data for slope calculation
                     # we fetch enough data to calculate SMA200 and the slope of it
                     data = yf.download(batch, period="300d", interval="1d", group_by='ticker', threads=True, progress=False)
-                    
                     for ticker in batch:
                         if ticker not in data.columns.get_level_values(0):
                             continue
-                            
                         df = data[ticker].dropna()
-                        
                         if self._process_ticker(ticker, df):
                             passed_tickers.append(ticker)
-
                 except Exception as e:
                     logger.error(f"Error processing batch starting with {batch[0]}: {e}")
 
@@ -110,7 +112,6 @@ class FilterEngine:
         # 1. Checking the position: the last closing price (close) is above the last SMA
         current_price = close.iloc[-1]
         current_sma = sma.iloc[-1]
-        
         if current_price <= current_sma:
             return False
 

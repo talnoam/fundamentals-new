@@ -85,12 +85,12 @@ class StockScanner:
         # step 1: fetch the fundamental data and primary filtering (Market Cap, etc.)
         # done in a vectorized or fast way
         raw_candidates = self.filter_engine.apply_coarse_filters(ticker_list)
+        total_candidates = len(raw_candidates) # save the total number for the progress bar
         logger.info(f"After coarse filtering: {len(raw_candidates)} candidates remain.")
 
         # step 2: graph analysis (the computationally heavy part)
         # here we use Parallel Processing in the ProcessPoolExecutor
         final_candidates = []
-
         max_workers = self.config.get('performance', {}).get('max_workers', 8)
 
         logger.info(f"Spawning Pool with {max_workers} workers...")
@@ -102,8 +102,9 @@ class StockScanner:
                 for ticker in raw_candidates
             }
             
-            for future in as_completed(futures):
+            for i, future in enumerate(as_completed(futures), 1): # progress bar
                 result = future.result()
+                logger.info(f"SCAN_PROGRESS: {i}/{total_candidates}")
                 if result:
                     final_candidates.append(result)
                     logger.info(f"✅ Found valid pattern for {result['ticker']} (Score: {result['score']:.2f})")
