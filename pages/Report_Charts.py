@@ -63,6 +63,32 @@ def list_report_charts():
 def load_chart_html(chart_path: Path) -> str:
     return chart_path.read_text(encoding="utf-8")
 
+def display_analysis_section(ticker, date, report_type):
+    """helper function to display the analysis results by type"""
+    filename = f"{ticker}_{date}_{report_type}.json"
+    path = AI_REPORTS_DIR / filename
+    
+    if path.exists():
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # הצגת סנטימנט
+        sentiment = data.get('sentiment', 'NEUTRAL')
+        if sentiment == "BULLISH": st.success(f"🟢 SENTIMENT: {sentiment}")
+        elif sentiment == "BEARISH": st.error(f"🔴 SENTIMENT: {sentiment}")
+        else: st.warning(f"🟡 SENTIMENT: {sentiment}")
+        
+        st.markdown(data.get('report', ''))
+        st.download_button(
+            label=f"Download {report_type.capitalize()} Report",
+            data=data.get('report', ''),
+            file_name=f"{ticker}_{report_type}_{date}.md",
+            mime="text/markdown",
+            key=f"dl_{ticker}_{report_type}"
+        )
+    else:
+        st.info(f"No {report_type} analysis generated yet.")
+
 
 # Configure Streamlit page
 st.set_page_config(
@@ -166,53 +192,46 @@ if analysis_path.exists() and analysis_key not in st.session_state:
     with open(analysis_path, "r", encoding="utf-8") as f:
         st.session_state[analysis_key] = json.load(f)
 
-col1, col2 = st.columns([3, 1])
 
-with col1:
-    st.caption(f"Date: {selected_chart['date']} | Score: {selected_chart['score']}")
-    st.info("Use zoom, pan, and hover to analyze the chart interactively.")
+st.caption(f"Date: {selected_chart['date']} | Score: {selected_chart['score']}")
+st.info("Use zoom, pan, and hover to analyze the chart interactively.")
 
-if analysis_key in st.session_state:
-    sentiment = st.session_state[analysis_key]['sentiment']
-    with col2:
-        if sentiment == "BULLISH":
-            st.success("🟢 BULLISH")
-        elif sentiment == "BEARISH":
-            st.error("🔴 BEARISH")
-        else:
-            st.warning("🟡 NEUTRAL")
 
 with st.spinner("Loading report chart..."):
     chart_html = load_chart_html(selected_chart["path"])
     components.html(chart_html, height=800, scrolling=True)
 
 st.divider()
-st.subheader(f"🔍 AI Equity Research: {selected_chart['ticker']}")
+st.subheader(f"🔍 AI Analysis Tools: {selected_chart['ticker']}")
 
-btn_label = f"Generate AI Analysis for {selected_chart['ticker']}" if analysis_key not in st.session_state else "Re-generate Analysis (Refresh)"
+# כפתורי הפעלה לניתוחים השונים
+col1, col2 = st.columns(2)
+analyzer = LLMAnalyzer(config.get("llm_analysis", {}))
 
-if st.button(btn_label, type="primary"):
-    with st.spinner(f"Analyzing {selected_chart['ticker']} fundamentals and macro..."):
-        llm_config = config.get("llm_analysis", {})
-        analyzer = LLMAnalyzer(llm_config)
-        analysis_data = analyzer.get_equity_report(selected_chart['ticker'])
+with col1:
+    if st.button("🚀 Generate Fundamental Analysis", use_container_width=True):
+        with st.spinner("Running deep fundamental research..."):
+            res = analyzer.get_equity_report(selected_chart['ticker'], report_type="fundamental")
+            with open(AI_REPORTS_DIR / f"{selected_chart['ticker']}_{selected_chart['date']}_fundamental.json", "w") as f:
+                json.dump(res, f)
+            st.rerun()
 
-        with open(analysis_path, "w", encoding="utf-8") as f:
-            json.dump(analysis_data, f, ensure_ascii=False, indent=4)
+with col2:
+    if st.button("🔥 Validate Breakout Momentum", type="primary", use_container_width=True):
+        with st.spinner("Analyzing catalyst and short-term flow..."):
+            res = analyzer.get_equity_report(selected_chart['ticker'], report_type="breakout")
+            with open(AI_REPORTS_DIR / f"{selected_chart['ticker']}_{selected_chart['date']}_breakout.json", "w") as f:
+                json.dump(res, f)
+            st.rerun()
 
-        st.session_state[analysis_key] = analysis_data
-        st.toast(f"Report saved to reports/ai_analysis/{analysis_filename}", icon="💾")
-        st.rerun()
+# display the analysis results in tabs
+tab_fund, tab_break = st.tabs(["📋 Fundamental Research", "⚡ Breakout Validation"])
 
-# Display the analysis if it exists
-if analysis_key in st.session_state:
-    st.markdown(st.session_state[analysis_key]['report'])
-    st.download_button(
-        label="Download Analysis Report",
-        data=st.session_state[analysis_key]['report'],
-        file_name=f"{selected_chart['ticker']}_analysis_{selected_chart['date']}.md",
-        mime="text/markdown"
-    )
+with tab_fund:
+    display_analysis_section(selected_chart['ticker'], selected_chart['date'], "fundamental")
+
+with tab_break:
+    display_analysis_section(selected_chart['ticker'], selected_chart['date'], "breakout")
 
 # Footer
 st.divider()
