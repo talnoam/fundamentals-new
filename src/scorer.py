@@ -22,6 +22,10 @@ class ScoringEngine:
             config.get('breakout_age_scores', {1: 1.0, 2: 0.7})
         )
         self.breakout_age_default_score = config.get('breakout_age_default_score', 0.0)
+        self.final_score_scale = config.get('final_score_scale', 100.0)
+        self.volatility_bonus_scale = config.get('volatility_bonus_scale', 10.0)
+        self.annual_trading_days = config.get('annual_trading_days', 252)
+        self.max_annual_volatility = config.get('max_annual_volatility', 0.50)
 
     def _normalize_age_scores(self, scores) -> dict:
         normalized = {}
@@ -79,7 +83,10 @@ class ScoringEngine:
                 strength_score * self.weights.get('breakout_strength', 0.1) +
                 freshness_score * self.weights.get('freshness', 0.1)
             )
-            final_score = (final_score * 100) + (vol_score * 10)
+            final_score = (
+                (final_score * self.final_score_scale) +
+                (vol_score * self.volatility_bonus_scale)
+            )
 
             return round(min(100, final_score), 2)
 
@@ -129,7 +136,9 @@ class ScoringEngine:
             
         # Annual volatility formula:
         # $\sigma_{annual} = \sigma_{daily} \cdot \sqrt{252}$
-        annual_vol = daily_returns.std() * (252 ** 0.5)
-        
-        # Normalization: volatility of 50% or higher gets a score of 1.0 (maximum score)
-        return float(max(0, min(1, annual_vol / 0.50)))
+        annual_vol = daily_returns.std() * (self.annual_trading_days ** 0.5)
+
+        # Normalization: volatility of max_annual_volatility or higher gets a score of 1.0
+        if self.max_annual_volatility <= 0:
+            return 0.0
+        return float(max(0, min(1, annual_vol / self.max_annual_volatility)))

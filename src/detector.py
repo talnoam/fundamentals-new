@@ -11,12 +11,31 @@ class PatternDetector:
         self.order = config.get('extrema_order', 5)  # How many days on each side of each point for it to be considered a peak.
         self.min_points = config.get('min_points', 3) # Minimum points for a trend line.
         self.convergence_threshold = config.get('convergence_threshold', 0.1) # Max distance ratio at the end.
-        self.windows = config.get('windows', [60, 90, 120, 160, 252])
         self.weight_start = config.get('trend_weight_start', 1.0)
         self.weight_end = config.get('trend_weight_end', 5.0)
         self.breakout_min_days = config.get('breakout_min_days', 1)
         self.breakout_max_days = config.get('breakout_max_days', 2)
         self.breakdown_confirm_days = config.get('breakdown_confirm_days', 2)
+        
+        # Adaptive windows configuration
+        adaptive_windows_config = config.get('adaptive_windows', {})
+        adaptive_start = adaptive_windows_config.get('start', 40)
+        adaptive_end = adaptive_windows_config.get('end', 360)
+        adaptive_step = adaptive_windows_config.get('step', 10)
+        self.adaptive_windows = list(range(adaptive_start, adaptive_end, adaptive_step))
+        
+        # Order adjustment configuration
+        order_adj_config = config.get('order_adjustment', {})
+        self.min_order = order_adj_config.get('min_order', 3)
+        self.order_threshold = order_adj_config.get('threshold', 100)
+        self.order_adjustment = order_adj_config.get('adjustment', -2)
+        
+        # Selection scoring configuration
+        scoring_config = config.get('selection_scoring', {})
+        self.quality_bonus_threshold = scoring_config.get('quality_bonus_threshold', 0.8)
+        self.quality_bonus_value = scoring_config.get('quality_bonus_value', 1.5)
+        self.window_weight_threshold = scoring_config.get('window_weight_threshold', 90)
+        self.window_weight_value = scoring_config.get('window_weight_value', 1.2)
 
     def analyze_convergence(self, df: pd.DataFrame) -> dict:
         """
@@ -31,18 +50,16 @@ class PatternDetector:
             'trendlines': {'upper': None, 'lower': None},
             'selection_score': -1.0
         }
-        
-        adaptive_windows = list(range(40, 360, 10))
 
         valid_results = []
         
-        for window in adaptive_windows:
+        for window in self.adaptive_windows:
             if len(df) < window: continue
             
             df_slice = df.tail(window).copy()
             
             # dynamic adjustment of the order
-            current_order = max(3, self.order if window > 100 else self.order - 2)
+            current_order = max(self.min_order, self.order if window > self.order_threshold else self.order + self.order_adjustment)
             
             # running the detection on the specific window
             original_order = self.order
@@ -52,9 +69,9 @@ class PatternDetector:
             
             if result['is_converging'] and result['is_breaking_out']:
                 # calculating a quality score that favors high R2 (precision over time)
-                # significant bonus for windows that show geometric "cleanliness" (R2 > 0.8)
-                quality_bonus = 1.5 if result['r2_high'] > 0.8 else 1.0
-                window_weight = 1.2 if window <= 90 else 1.0
+                # significant bonus for windows that show geometric "cleanliness" (R2 > threshold)
+                quality_bonus = self.quality_bonus_value if result['r2_high'] > self.quality_bonus_threshold else 1.0
+                window_weight = self.window_weight_value if window <= self.window_weight_threshold else 1.0
                 
                 result['selection_score'] = result['r2_high'] * window_weight * quality_bonus
                 result['used_window'] = window

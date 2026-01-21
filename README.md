@@ -239,6 +239,31 @@ python stock_scanner/test_single_ticker.py AAPL --config config/settings.yaml
 - `stock_scanner/test_single_ticker.py`: Script to test pattern detection and scoring for a single ticker
 - `config/settings.yaml`: Centralized thresholds and scoring parameters for the scanner
 
+## Configuration
+
+The `config/settings.yaml` file contains all configurable parameters for the stock scanner. Key sections include:
+
+### Pattern Detection (`patterns` section)
+- `adaptive_windows`: Configuration for adaptive window scanning
+  - `start`: Starting window size (default: 40)
+  - `end`: Ending window size (default: 360)
+  - `step`: Step size between windows (default: 10)
+- `order_adjustment`: Dynamic order adjustment based on window size
+  - `min_order`: Minimum order value (default: 3)
+  - `threshold`: Window size threshold for order adjustment (default: 100)
+  - `adjustment`: Order adjustment value for smaller windows (default: -2)
+- `selection_scoring`: Parameters for scoring pattern quality
+  - `quality_bonus_threshold`: R² threshold for quality bonus (default: 0.8)
+  - `quality_bonus_value`: Bonus multiplier for high-quality patterns (default: 1.5)
+  - `window_weight_threshold`: Window size threshold for weight adjustment (default: 90)
+  - `window_weight_value`: Weight multiplier for smaller windows (default: 1.2)
+
+### Scoring (`scoring` section)
+- `final_score_scale`: Multiplier for the final normalized score (default: 100.0)
+- `volatility_bonus_scale`: Bonus multiplier for volatility score (default: 10.0)
+- `annual_trading_days`: Trading days used for annualized volatility (default: 252)
+- `max_annual_volatility`: Volatility cap for full score (default: 0.50)
+
 ## Investment Methodology
 
 This tool focuses on fundamental analysis for profitable companies using:

@@ -8,12 +8,24 @@ patterns:
   extrema_order: 5
   min_points: 3
   convergence_threshold: 0.7
-  windows: [60, 90, 120, 160, 252]
   trend_weight_start: 1.0
   trend_weight_end: 5.0
   breakout_min_days: 1
   breakout_max_days: 2
   breakdown_confirm_days: 2
+  adaptive_windows:
+    start: 40
+    end: 360
+    step: 10
+  order_adjustment:
+    min_order: 3
+    threshold: 100
+    adjustment: -2
+  selection_scoring:
+    quality_bonus_threshold: 0.8
+    quality_bonus_value: 1.5
+    window_weight_threshold: 90
+    window_weight_value: 1.2
 
 data:
   cache_dir: ".cache/historical_data"
@@ -24,7 +36,7 @@ data:
 visualization:
   charts_output_dir: "reports/charts"
   ai_reports_output_dir: "reports/ai_analysis"
-  top_n: 5 # How many charts to generate at the end of the run
+  top_n: 10 # How many charts to generate at the end of the run
   show_plot: False
 
 scoring:
@@ -42,6 +54,10 @@ scoring:
     "1": 1.0
     "2": 0.7
   breakout_age_default_score: 0.0
+  final_score_scale: 100.0
+  volatility_bonus_scale: 10.0
+  annual_trading_days: 252
+  max_annual_volatility: 0.50
 
 llm_analysis:
   model: "gpt-5" # gpt-4o is faster but gpt-5 is more accurate
