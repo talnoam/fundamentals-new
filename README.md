@@ -9,9 +9,10 @@ A multi-page Streamlit application for fundamental and technical stock analysis 
 pip install -r requirements.txt
 ```
 
-2. (Optional) Create a `.env` file with your SerpAPI key:
+2. (Optional) Create a `.env` file with your API keys:
 ```
 SERPAPI_KEY=your_serpapi_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
 3. Run the application:
