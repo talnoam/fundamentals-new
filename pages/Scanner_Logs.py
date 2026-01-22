@@ -21,7 +21,11 @@ def parse_logs(log_path):
                     "Level": parts[2],
                     "Message": " - ".join(parts[3:])
                 })
-    return pd.DataFrame(log_data)
+    df = pd.DataFrame(log_data)
+    if not df.empty:
+        # convert Timestamp to Date for filtering
+        df['Date'] = df['Timestamp'].str.split(' ').str[0]
+    return df
 
 st.set_page_config(page_title="Scanner Monitor", page_icon="🖥️", layout="wide")
 st.title("🖥️ Scanner Monitor & Progress")
@@ -33,61 +37,70 @@ if st.button("🔄 Refresh Status"):
 df_logs = parse_logs(LOG_FILE)
 
 if not df_logs.empty:
-    # --- part 1: progress bar (two-step) ---
+
+    st.sidebar.header("Log Filters")
+
+    # filter by level
+    all_levels = df_logs["Level"].unique().tolist()
+    selected_levels = st.sidebar.multiselect("Filter by Level", all_levels, default=all_levels)
+
+    # filter by date
+    all_dates = sorted(df_logs["Date"].unique().tolist(), reverse=True)
+    selected_date = st.sidebar.selectbox("Filter by Date", ["All Dates"] + all_dates)
+
+    # --- fix: find the start of the current scan ---
+    # search for the last line that contains the start of the filtering message
+    start_indices = df_logs[df_logs["Message"].str.contains("Applying coarse filters to", na=False)].index
     
-    # find the progress messages from the two steps
-    filter_progress_lines = df_logs[df_logs["Message"].str.contains("FILTER_PROGRESS:", na=False)]
-    scan_progress_lines = df_logs[df_logs["Message"].str.contains("SCAN_PROGRESS:", na=False)]
+    if not start_indices.empty:
+        current_run_df = df_logs.loc[start_indices[-1]:]
+    else:
+        current_run_df = df_logs
+
+    # search for progress messages only within the current run
+    scan_progress = current_run_df[current_run_df["Message"].str.contains("SCAN_PROGRESS:", na=False)]
+    filter_progress = current_run_df[current_run_df["Message"].str.contains("FILTER_PROGRESS:", na=False)]
     
-    if not scan_progress_lines.empty:
-        # step 2: deep analysis
-        latest_msg = scan_progress_lines.iloc[-1]["Message"]
+    # display progress by step order
+    if not scan_progress.empty:
+        latest_msg = scan_progress.iloc[-1]["Message"]
         match = re.search(r"SCAN_PROGRESS:\s*(\d+)/(\d+)", latest_msg)
         if match:
             current, total = int(match.group(1)), int(match.group(2))
-            st.subheader(f"Step 2/2: Deep Analysis ({current} / {total} candidates)")
+            st.subheader(f"Step 2/2: Deep Analysis ({current} / {total})")
             st.progress(current / total)
-            if current == total:
-                st.success("✅ Full scan completed successfully.")
-            else:
-                st.info("⏳ Running pattern detection and AI scoring...")
-
-    elif not filter_progress_lines.empty:
-        # step 1: coarse filtering
-        latest_msg = filter_progress_lines.iloc[-1]["Message"]
+    elif not filter_progress.empty:
+        latest_msg = filter_progress.iloc[-1]["Message"]
         match = re.search(r"FILTER_PROGRESS:\s*(\d+)/(\d+)", latest_msg)
         if match:
             current, total = int(match.group(1)), int(match.group(2))
-            st.subheader(f"Step 1/2: Coarse Filtering ({current} / {total} tickers)")
+            st.subheader(f"Step 1/2: Coarse Filtering ({current} / {total})")
             st.progress(current / total)
-            st.warning(f"🔍 Filtering {total} tickers by Market Cap and Trend...")
-
     else:
-        st.info("Scanner is initializing or waiting for progress data...")
+        st.info("🚀 Starting new scan... Waiting for updates.")
 
     st.divider()
 
-    # --- part 2: filtering and searching logs ---
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        search = st.text_input("🔍 Search Logs (Ticker, Error, etc.)")
-    with col2:
-        levels = df_logs["Level"].unique().tolist()
-        selected_levels = st.multiselect("Filter Levels", levels, default=levels)
-
+    # apply the filters to the dataframe
     filtered_df = df_logs[df_logs["Level"].isin(selected_levels)]
+    if selected_date != "All Dates":
+        filtered_df = filtered_df[filtered_df["Date"] == selected_date]
+
+    search = st.text_input("🔍 Search Logs")
     if search:
         filtered_df = filtered_df[filtered_df["Message"].str.contains(search, case=False, na=False)]
 
+    # display the filtered dataframe
     st.dataframe(
         filtered_df.iloc[::-1],
         use_container_width=True,
         hide_index=True,
         column_config={
-            "Timestamp": st.column_config.TextColumn("Time", width="small"),
-            "Level": st.column_config.TextColumn("Level", width="small"),
-            "Message": st.column_config.TextColumn("Message", width="large")
+            "Timestamp": st.column_config.TextColumn("Time"),
+            "Level": st.column_config.TextColumn("Level"),
+            "Message": st.column_config.TextColumn("Message", width="large"),
+            "Date": None  # hide the helper column
         }
     )
 else:
-    st.warning("No log file found. Please run the scanner first.")
+    st.warning("No logs found.")
