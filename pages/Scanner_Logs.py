@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import re
 from pathlib import Path
+from src.version_manager import VersionManager
 
 # path to the log file as defined in scanner.py
 LOG_FILE = Path(__file__).parent.parent / "scanner.log"
@@ -28,6 +29,10 @@ def parse_logs(log_path):
     return df
 
 st.set_page_config(page_title="Scanner Monitor", page_icon="🖥️", layout="wide")
+
+# display the version in the sidebar
+VersionManager.display_version_sidebar()
+
 st.title("🖥️ Scanner Monitor & Progress")
 
 # refresh button at the top of the page
@@ -88,7 +93,7 @@ if not df_logs.empty:
 
     search = st.text_input("🔍 Search Logs")
     if search:
-        filtered_df = filtered_df[filtered_df["Message"].str.contains(search, case=False, na=False)]
+        filtered_df = filtered_df[filtered_df["Message"].str.contains(search, case=False, na=False, regex=False)]
 
     # display the filtered dataframe
     st.dataframe(

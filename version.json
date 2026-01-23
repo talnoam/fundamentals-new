@@ -1,0 +1,11 @@
+{
+    "version": "0.1.0",
+    "release_date": "2026-01-23",
+    "update_url": "https://raw.githubusercontent.com/talnoam/fundamentals-new/main/version.txt",
+    "changelog": [
+        "v0.1.0: Initial release - Multi-page Streamlit investment analysis dashboards",
+        "v0.1.0: Stock scanner with pattern detection and breakout validation",
+        "v0.1.0: AI-powered analysis with multi-mode capabilities",
+        "v0.1.0: Core dashboards: Fundamentals, Technical Analysis, Market Analysis, Report Charts, Scanner Logs"
+    ]
+}

@@ -12,6 +12,7 @@ from report import (
     create_multi_indicator_chart,
     analyze_market_environment,
 )
+from src.version_manager import VersionManager 
 
 # Configure Streamlit page
 st.set_page_config(
@@ -20,6 +21,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# display the version in the sidebar
+VersionManager.display_version_sidebar()
 
 # Market indicators mapping (display name: ticker symbol)
 MARKET_INDICATORS = {

@@ -1,4 +1,5 @@
 import streamlit as st
+from src.version_manager import VersionManager 
 
 # Configure Streamlit page
 st.set_page_config(
@@ -7,6 +8,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# display the version in the sidebar
+VersionManager.display_version_sidebar()   
 
 # Landing page content
 st.title("📊 Investment Analysis Dashboards")

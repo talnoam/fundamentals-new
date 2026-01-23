@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Import the analysis functions from report.py
 from report import analyze_company, display_analysis_results, create_candlestick_chart
 from report_utils import get_all_tickers
+from src.version_manager import VersionManager 
 
 # Configure Streamlit page
 st.set_page_config(
@@ -17,6 +18,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# display the version in the sidebar
+VersionManager.display_version_sidebar() 
 
 # Initialize session state
 if 'analysis_results' not in st.session_state:

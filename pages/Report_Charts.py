@@ -9,6 +9,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from src.llm_analyzer import LLMAnalyzer
+from src.version_manager import VersionManager 
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -97,6 +98,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# display the version in the sidebar
+VersionManager.display_version_sidebar()
 
 # Dashboard title
 st.title("📊 Report Charts Dashboard")
