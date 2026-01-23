@@ -2,6 +2,7 @@ import json
 import requests
 import streamlit as st
 from pathlib import Path
+from packaging import version
 
 VERSION_FILE = Path(__file__).parent.parent / "version.json"
 
@@ -22,10 +23,9 @@ class VersionManager:
 
         try:
             response = requests.get(url, timeout=5)
-            # תיקון: בדיקה שהקובץ אכן נמצא בשרת
             if response.status_code == 200:
                 latest_version = response.text.strip()
-                if latest_version != current_version:
+                if version.parse(latest_version) > version.parse(current_version):
                     return latest_version
         except Exception:
             pass
