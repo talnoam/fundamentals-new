@@ -9,7 +9,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from src.llm_analyzer import LLMAnalyzer
-from src.version_manager import VersionManager 
+from src.version_manager import VersionManager
+from stock_scanner.scanner import StockScanner
+from src.ticker_provider import TickerProvider 
 
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -73,7 +75,7 @@ def display_analysis_section(ticker, date, report_type):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        # הצגת סנטימנט
+        # display the sentiment
         sentiment = data.get('sentiment', 'NEUTRAL')
         if sentiment == "BULLISH": st.success(f"🟢 SENTIMENT: {sentiment}")
         elif sentiment == "BEARISH": st.error(f"🔴 SENTIMENT: {sentiment}")
@@ -101,6 +103,33 @@ st.set_page_config(
 
 # display the version in the sidebar
 VersionManager.display_version_sidebar()
+
+# Sidebar - Scanner trigger button
+st.sidebar.header("🔍 Stock Scanner")
+if st.sidebar.button("🚀 Run Stock Scanner", type="primary", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("Running stock scanner..."):
+            try:
+                # Initialize scanner and ticker provider
+                scanner = StockScanner()
+                provider = TickerProvider(cache_expiry_days=1)
+                
+                # Fetch all tickers
+                tickers_to_scan = provider.get_all_tickers(
+                    include_nasdaq=True, 
+                    include_sp500=True, 
+                    include_dow=True
+                )
+                
+                # Run the scan
+                scanner.scan(tickers_to_scan)
+                
+                st.sidebar.success("✅ Scan completed! Check the reports/charts directory for new charts.")
+                st.cache_data.clear()  # Clear cache to refresh the chart list
+                st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"❌ Error running scanner: {str(e)}")
+                st.sidebar.exception(e)
 
 # Dashboard title
 st.title("📊 Report Charts Dashboard")
@@ -208,7 +237,7 @@ with st.spinner("Loading report chart..."):
 st.divider()
 st.subheader(f"🔍 AI Analysis Tools: {selected_chart['ticker']}")
 
-# כפתורי הפעלה לניתוחים השונים
+# buttons for the different analyses
 col1, col2 = st.columns(2)
 analyzer = LLMAnalyzer(config.get("llm_analysis", {}))
 
