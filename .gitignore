@@ -9,3 +9,4 @@ __pycache__/
 scanner.log
 reports/
 .scan_status.json
+backtest.log

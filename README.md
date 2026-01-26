@@ -27,6 +27,7 @@ streamlit run app.py
 - **Report Charts**: Browse and analyze saved report charts from previous scans
 - **Market Analysis**: Compare market indicators, commodities, and economic data across multiple timeframes
 - **Scanner Logs**: View scanner execution logs and results
+- **Backtest Analytics**: Evaluate historical performance of scanner suggestions with detailed metrics and visualizations
 
 ## 🔍 Stock Scanner
 
@@ -42,10 +43,12 @@ python stock_scanner/scanner.py
 python stock_scanner/test_single_ticker.py TICKER
 ```
 
-Example:
+**Backtest historical suggestions:**
 ```bash
-python stock_scanner/test_single_ticker.py AAPL
+python stock_scanner/analyze_results.py
 ```
+
+This validates past scanner suggestions by calculating actual returns, hit rates, and score correlation using real market data. Results are saved to `reports/backtest_summary.csv` and visualized in the Backtest Analytics dashboard.
 
 ## ⚙️ Configuration
 

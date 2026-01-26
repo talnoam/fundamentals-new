@@ -41,15 +41,23 @@ class DataEngine:
                 period=self.default_period, 
                 interval=self.default_interval,
                 progress=False,
-                auto_adjust=True 
+                auto_adjust=False 
             )
 
             if df.empty:
                 logger.warning(f"No data returned for {ticker}")
                 return pd.DataFrame()
 
+            # Clean up column structure
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
+            
+            # Handle duplicate columns (Yahoo Finance API bug)
+            if df.columns.duplicated().any():
+                logger.warning(f"{ticker}: Duplicate columns detected, keeping first occurrence")
+                df = df.loc[:, ~df.columns.duplicated(keep='first')]
+            
+            # Select required columns
             df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
 
             # Saving to the cache.
@@ -60,6 +68,88 @@ class DataEngine:
         except Exception as e:
             logger.error(f"Error fetching {ticker} from Yahoo Finance: {e}")
             return pd.DataFrame()
+
+    def fetch_historical_data_range(self, ticker: str, start_date: datetime, end_date: datetime = None) -> pd.DataFrame:
+        """
+        Fetches historical data for a specific date range.
+        Optimized for backtesting - fetches from start_date to end_date (or today).
+        
+        Args:
+            ticker: Stock ticker symbol
+            start_date: Start date for data fetch
+            end_date: End date for data fetch (defaults to today)
+            
+        Returns:
+            DataFrame with OHLCV data
+        """
+        if end_date is None:
+            end_date = datetime.now()
+        
+        # Create a cache key based on date range
+        cache_filename = f"{ticker}_range_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.parquet"
+        cache_path = os.path.join(self.cache_dir, cache_filename)
+        
+        # Check cache (valid for 1 day for date ranges)
+        if self._is_range_cache_valid(cache_path, end_date):
+            try:
+                df = pd.read_parquet(cache_path)
+                if not df.empty:
+                    logger.debug(f"{ticker}: Loaded from range cache")
+                    return df
+            except Exception as e:
+                logger.warning(f"Could not read range cache for {ticker}: {e}")
+        
+        # Fetch from API with date range
+        try:
+            logger.info(f"Downloading {ticker} from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}...")
+            df = yf.download(
+                ticker,
+                start=start_date.strftime('%Y-%m-%d'),
+                end=end_date.strftime('%Y-%m-%d'),
+                interval=self.default_interval,
+                progress=False,
+                auto_adjust=False
+            )
+            
+            if df.empty:
+                logger.warning(f"{ticker}: No data returned for date range")
+                return pd.DataFrame()
+            
+            # Clean up column structure
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            # Handle duplicate columns (Yahoo Finance API bug)
+            if df.columns.duplicated().any():
+                logger.warning(f"{ticker}: Duplicate columns detected, keeping first occurrence")
+                df = df.loc[:, ~df.columns.duplicated(keep='first')]
+            
+            # Select required columns
+            df = df[['Open', 'High', 'Low', 'Close', 'Volume']].dropna()
+            
+            # Save to cache
+            df.to_parquet(cache_path)
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error fetching {ticker} date range from Yahoo Finance: {e}")
+            return pd.DataFrame()
+
+    def _is_range_cache_valid(self, path: str, end_date: datetime) -> bool:
+        """Check if range cache is valid. Only valid if end_date is not today."""
+        if not os.path.exists(path):
+            return False
+        
+        # If end_date is today or recent, cache expires quickly (1 hour)
+        days_old = (datetime.now() - end_date).days
+        if days_old <= 1:
+            file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(path))
+            return file_age < timedelta(hours=1)
+        
+        # For historical data, cache is valid for longer (24 hours)
+        file_age = datetime.now() - datetime.fromtimestamp(os.path.getmtime(path))
+        return file_age < timedelta(hours=24)
 
     def _is_cache_valid(self, path: str) -> bool:
         if not os.path.exists(path):

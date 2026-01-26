@@ -62,6 +62,14 @@ scoring:
   annual_trading_days: 252
   max_annual_volatility: 0.50
 
+backtest:
+  target_profit: 0.05  # 5% profit target
+  stop_loss: 0.03      # 3% stop-loss
+  min_score_threshold: 60  # Minimum score to consider for backtesting
+  output_csv: "reports/backtest_summary.csv"
+  performance_window_days: 30  # Days to track performance after signal
+  debug_mode: false  # Set to true to disable parallel processing for debugging
+
 llm_analysis:
   model: "gpt-5" # gpt-4o is faster but gpt-5 is more accurate
   temperature: 0 # 0 for deterministic output, 1 for more creative output
