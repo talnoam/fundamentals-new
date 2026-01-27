@@ -1,13 +1,16 @@
 import logging
-import yaml
-import pandas as pd
-import numpy as np
+import os
 import sys
 import re
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time, date
 from typing import List, Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pandas as pd
+import pytz
+import yaml
 
 # Add the parent directory to the Python path
 parent_dir = Path(__file__).parent.parent
@@ -26,6 +29,112 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("BacktestAnalyzer")
+
+
+def get_valid_entry_price(
+    ticker_symbol: str,
+    html_file_path: str,
+    data_engine: Optional[DataEngine] = None,
+) -> Tuple[Optional[float], Any, Dict[str, Any]]:
+    """
+    Determine a valid entry price based on when the HTML analysis report was created.
+
+    Logic:
+    1. Read the file's modification time and convert it to US/Eastern (exchange time).
+    2. If the timestamp is during regular market hours (Mon–Fri, 09:30–16:00 ET),
+       treat the signal as invalid and return (None, error_message).
+    3. Compute a reference date:
+       - If created after market close (>= 16:00), reference date = same calendar day.
+       - If created before market open (< 09:30), reference date = previous calendar day.
+       - If created on a weekend, roll back to the last weekday (Friday, etc.).
+    4. Fetch a small historical window ending at the reference date using DataEngine
+       (which internally uses yfinance). Because yfinance only returns trading days,
+       the last available row in that window is the correct last close (handling
+       weekends/holidays transparently).
+
+    Returns:
+        (entry_price, actual_trade_date, meta) on success, or
+        (None, error_message, meta) on failure, where `meta` contains
+        debug information such as the scan timestamp in US/Eastern and
+        the computed reference date.
+    """
+    try:
+        if not os.path.exists(html_file_path):
+            return None, f"{ticker_symbol}: HTML report path does not exist: {html_file_path}", {}
+
+        # 1) File modification time -> US/Eastern
+        mtime = os.path.getmtime(html_file_path)
+        utc_dt = datetime.fromtimestamp(mtime, tz=pytz.UTC)
+        eastern = pytz.timezone("US/Eastern")
+        local_dt = utc_dt.astimezone(eastern)
+
+        local_date = local_dt.date()
+        local_time = local_dt.time()
+
+        # 2) Market hours validation
+        market_open = time(9, 30)
+        market_close = time(16, 0)
+        is_market_day = local_dt.weekday() < 5  # Mon–Fri
+
+        if is_market_day and market_open <= local_time < market_close:
+            # Scan ran while market was trading – treat as invalid for backtest
+            meta = {
+                "scan_timestamp_et": local_dt,
+                "reference_date": None,
+            }
+            return None, f"{ticker_symbol}: scan ran during market hours ({local_dt.isoformat()})", meta
+
+        # 3) Reference date calculation
+        if local_dt.weekday() >= 5:
+            # Weekend: roll back to last weekday (typically Friday)
+            reference_date = local_date
+            while reference_date.weekday() >= 5:
+                reference_date -= timedelta(days=1)
+        else:
+            if local_time >= market_close:
+                # After close -> same day
+                reference_date = local_date
+            else:
+                # Before open (and not during market hours due to check above) -> previous day
+                reference_date = local_date - timedelta(days=1)
+
+        # 4) Fetch small historical window around the reference date
+        if data_engine is None:
+            # Fallback DataEngine with default config if not provided
+            data_engine = DataEngine({})
+
+        start_date = datetime.combine(reference_date - timedelta(days=10), time(0, 0))
+        end_date = datetime.combine(reference_date + timedelta(days=1), time(0, 0))
+
+        df = data_engine.fetch_historical_data_range(
+            ticker_symbol,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        meta: Dict[str, Any] = {
+            "scan_timestamp_et": local_dt,
+            "reference_date": reference_date,
+        }
+
+        if df is None or df.empty:
+            return None, f"{ticker_symbol}: no historical data available around reference date {reference_date}", meta
+
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+
+        df = df.sort_index()
+        last_row = df.iloc[-1]
+        actual_trade_date = df.index[-1]
+        entry_price = float(last_row["Close"])
+
+        return entry_price, actual_trade_date, meta
+    except Exception as exc:
+        logger.error(
+            f"{ticker_symbol}: error determining valid entry price from report {html_file_path} - {exc}",
+            exc_info=True,
+        )
+        return None, f"{ticker_symbol}: unexpected error in get_valid_entry_price: {exc}", {}
 
 
 def parse_filename(filename: str) -> Optional[Dict[str, Any]]:
@@ -90,9 +199,16 @@ def calculate_outcome(prices: pd.Series, entry_price: float,
     return "Pending", None
 
 
-def analyze_single_ticker(ticker: str, analysis_date: datetime, score: int,
-                          data_engine, target_profit: float, stop_loss: float,
-                          performance_window_days: int) -> Optional[Dict[str, Any]]:
+def analyze_single_ticker(
+    ticker: str,
+    analysis_date: datetime,
+    score: int,
+    data_engine,
+    target_profit: float,
+    stop_loss: float,
+    performance_window_days: int,
+    report_path: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
     """
     Analyze historical performance for a single ticker recommendation.
     
@@ -113,9 +229,9 @@ def analyze_single_ticker(ticker: str, analysis_date: datetime, score: int,
         # We need: 1 year before analysis_date (for context) + data until today (for future performance)
         start_date = analysis_date - timedelta(days=365)
         end_date = datetime.now()
-        
+
         df = data_engine.fetch_historical_data_range(ticker, start_date, end_date)
-        
+
         if df is None or df.empty:
             logger.warning(f"{ticker}: No historical data available")
             return None
@@ -124,17 +240,31 @@ def analyze_single_ticker(ticker: str, analysis_date: datetime, score: int,
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index)
         
-        # Find the entry price (close on analysis date or nearest prior date)
-        analysis_date_ts = pd.Timestamp(analysis_date)
-        
-        # Get data on or before analysis date
-        prior_data = df[df.index <= analysis_date_ts]
-        if prior_data.empty:
-            logger.warning(f"{ticker}: No data available on or before {analysis_date}")
-            return None
-        
-        entry_price = prior_data.iloc[-1]['Close']
-        entry_date = prior_data.index[-1]
+        # Determine entry price / entry date based on when the scan actually ran
+        scan_timestamp_et: Optional[datetime] = None
+        reference_date: Optional[datetime] = None
+        if report_path:
+            entry_price, entry_info, meta = get_valid_entry_price(ticker, report_path, data_engine=data_engine)
+            if entry_price is None:
+                # entry_info is an error message
+                logger.warning(entry_info)
+                return None
+            entry_date = pd.to_datetime(entry_info)
+            scan_timestamp_et = meta.get("scan_timestamp_et")
+            reference_date = meta.get("reference_date")
+        else:
+            # Fallback: use close on analysis date or nearest prior date
+            analysis_date_ts = pd.Timestamp(analysis_date)
+            
+            # Get data on or before analysis date
+            prior_data = df[df.index <= analysis_date_ts]
+            if prior_data.empty:
+                logger.warning(f"{ticker}: No data available on or before {analysis_date}")
+                return None
+            
+            entry_price = prior_data.iloc[-1]['Close']
+            entry_date = prior_data.index[-1]
+            # We don't have a precise scan timestamp here; use N/A in debug columns
         
         # Get future data (after entry date)
         future_data = df[df.index > entry_date]
@@ -206,6 +336,13 @@ def analyze_single_ticker(ticker: str, analysis_date: datetime, score: int,
             'analysis_date': analysis_date.strftime('%Y-%m-%d'),
             'entry_date': entry_date.strftime('%Y-%m-%d'),
             'entry_price': round(entry_price, 2),
+            'scan_timestamp_et': scan_timestamp_et.isoformat() if isinstance(scan_timestamp_et, datetime) else 'N/A',
+            # reference_date is stored as a date in get_valid_entry_price meta
+            'reference_date': (
+                reference_date.strftime('%Y-%m-%d')
+                if isinstance(reference_date, (datetime, date, pd.Timestamp))
+                else 'N/A'
+            ),
             'score': score,
             'max_return_pct': round(max_return, 2),
             'max_return_date': max_return_date.strftime('%Y-%m-%d'),
@@ -270,6 +407,8 @@ class BacktestAnalyzer:
         for file_path in charts_path.glob("*.html"):
             parsed = parse_filename(file_path.name)
             if parsed and parsed['score'] >= self.min_score_threshold:
+                # Attach the full path so we can use the file's timestamp
+                parsed['report_path'] = str(file_path)
                 reports.append(parsed)
         
         logger.info(f"Found {len(reports)} reports with score >= {self.min_score_threshold}")
@@ -304,7 +443,8 @@ class BacktestAnalyzer:
                     self.data_engine,
                     self.target_profit,
                     self.stop_loss,
-                    self.performance_window_days
+                    self.performance_window_days,
+                    report.get('report_path')
                 )
                 if result:
                     results.append(result)
@@ -323,7 +463,8 @@ class BacktestAnalyzer:
                     self.data_engine,  # Can pass object with threads
                     self.target_profit,
                     self.stop_loss,
-                    self.performance_window_days
+                    self.performance_window_days,
+                    report.get('report_path')
                 ): report['ticker']
                 for report in reports
             }

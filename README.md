@@ -48,7 +48,11 @@ python stock_scanner/test_single_ticker.py TICKER
 python stock_scanner/analyze_results.py
 ```
 
-This validates past scanner suggestions by calculating actual returns, hit rates, and score correlation using real market data. Results are saved to `reports/backtest_summary.csv` and visualized in the Backtest Analytics dashboard.
+This validates past scanner suggestions by:
+- **Aligning entry prices** with the actual time each HTML report was generated (using US/Eastern market hours and last valid close, including weekends/holidays)
+- Calculating realized returns, hit rates, and score correlation using cached historical market data via the central `DataEngine`
+
+Results are saved to `reports/backtest_summary.csv` and visualized in the Backtest Analytics dashboard.
 
 ## ⚙️ Configuration
 
