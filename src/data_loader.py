@@ -41,7 +41,7 @@ class DataEngine:
                 period=self.default_period, 
                 interval=self.default_interval,
                 progress=False,
-                auto_adjust=False 
+                auto_adjust=True 
             )
 
             if df.empty:
@@ -108,7 +108,7 @@ class DataEngine:
                 end=end_date.strftime('%Y-%m-%d'),
                 interval=self.default_interval,
                 progress=False,
-                auto_adjust=False
+                auto_adjust=True
             )
             
             if df.empty:
