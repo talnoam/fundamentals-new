@@ -1,3 +1,4 @@
+import importlib
 import logging
 import yaml
 import pandas as pd
@@ -31,10 +32,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("StockScanner")
 
-# External helper function for parallel processing
-def analyze_single_ticker(ticker: str, data_engine, detector, scorer):
+def _load_config_static(path: str) -> Dict:
+    """Load config from path. Used by worker processes (must not rely on self)."""
+    try:
+        with open(path, 'r') as f:
+            return yaml.safe_load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def _analyze_one(ticker: str, data_engine, detector, scorer) -> Dict[str, Any] | None:
     """
-    Runs the entire analysis for a single ticker. This function runs in a separate Process.
+    Runs the entire analysis for a single ticker (used inside worker with already-built engines).
     """
     try:
         df = data_engine.fetch_historical_data(ticker)
@@ -42,7 +51,7 @@ def analyze_single_ticker(ticker: str, data_engine, detector, scorer):
             return None
 
         pattern_result = detector.analyze_convergence(df)
-        
+
         # Only if there is a breakout (1-2 days above the line) and high quality, we calculate the score
         if pattern_result.get('is_breaking_out') and pattern_result.get('r2_high', 0) >= 0.5:
             score = scorer.calculate_score(df, pattern_result)
@@ -54,13 +63,27 @@ def analyze_single_ticker(ticker: str, data_engine, detector, scorer):
                     'score': score
                 }
     except Exception:
-        # In Multiprocessing, it is important to catch errors so that the Pool does not crash
         return None
     return None
 
+
+def analyze_single_ticker(ticker: str, config_path: str) -> Dict[str, Any] | None:
+    """
+    Worker entry point for ProcessPoolExecutor. Takes only picklable args so that
+    subprocess can unpickle correctly when run from Streamlit or other hosts.
+    Builds DataEngine, PatternDetector, ScoringEngine inside the worker process.
+    """
+    config = _load_config_static(config_path)
+    data_engine = DataEngine(config.get('data', {}))
+    detector = PatternDetector(config.get('patterns', {}))
+    scorer = ScoringEngine(config.get('scoring', {}))
+    return _analyze_one(ticker, data_engine, detector, scorer)
+
 class StockScanner:
     def __init__(self, config_path: str = "config/settings.yaml"):
-        self.config = self._load_config(config_path)
+        # Resolve to absolute so worker processes find config regardless of cwd.
+        self.config_path = str(Path(config_path).resolve()) if Path(config_path).is_absolute() else str((Path(__file__).parent.parent / config_path).resolve())
+        self.config = self._load_config(self.config_path)
         self.data_engine = DataEngine(self.config.get('data', {}))
         # Pass data_engine to FilterEngine so it can use cached data
         self.filter_engine = FilterEngine(self.config.get('filters', {}), data_engine=self.data_engine)
@@ -94,11 +117,15 @@ class StockScanner:
         max_workers = self.config.get('performance', {}).get('max_workers', 8)
 
         logger.info(f"Spawning Pool with {max_workers} workers...")
-        
+        # Resolve worker function by module name so pickle sees the same object when
+        # run from Streamlit or other hosts (avoids "not the same object" PicklingError).
+        _scanner_mod = importlib.import_module("stock_scanner.scanner")
+        _worker_fn = getattr(_scanner_mod, "analyze_single_ticker")
+
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Sending all the tasks to the Pool
+            # Only picklable args: ticker + config_path; worker builds engines inside process.
             futures = {
-                executor.submit(analyze_single_ticker, ticker, self.data_engine, self.detector, self.scorer): ticker 
+                executor.submit(_worker_fn, ticker, self.config_path): ticker
                 for ticker in raw_candidates
             }
             
